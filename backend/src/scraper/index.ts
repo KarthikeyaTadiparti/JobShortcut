@@ -7,11 +7,19 @@ import { extractJobLinks as scrapePlacement } from "./placement_officer_scraper.
 import { extractJobLinks as scrapeFreshersHunt } from "./freshers_hunt_scraper.js";
 import { extractJobLinks as scrapeDailyPharma } from "./dailypharmajobs_scraper.js";
 
+export interface ScrapedJob {
+  company: string | null;
+  jobRole: string | null;
+  experience: string | null;
+  location: string | null;
+  applyLinks: string[];
+}
+
 /**
  * Routes a single URL to its specialized scraper.
  * Returns null if the scraper fails or the domain is unsupported.
  */
-export async function scrapeUrl(url: string): Promise<string[] | null> {
+export async function scrapeUrl(url: string): Promise<ScrapedJob | null> {
   try {
     const parsedUrl = new URL(url);
     const hostname = parsedUrl.hostname.toLowerCase();
@@ -40,8 +48,8 @@ export async function scrapeUrl(url: string): Promise<string[] | null> {
  * Scrapes multiple URLs, gathers results in a Record, and returns them.
  * Failed/Unsupported URLs will have a null value.
  */
-export async function scrapeUrls(urls: string[]): Promise<Record<string, string[] | null>> {
-  const results: Record<string, string[] | null> = {};
+export async function scrapeUrls(urls: string[]): Promise<Record<string, ScrapedJob | null>> {
+  const results: Record<string, ScrapedJob | null> = {};
 
   for (const url of urls) {
     try {
@@ -77,17 +85,26 @@ async function main() {
     const results = await scrapeUrls(urls);
 
     console.log("\n=================== SCRAPING RESULTS ===================");
-    for (const [url, links] of Object.entries(results)) {
+    for (const [url, jobData] of Object.entries(results)) {
       console.log(`\nURL: ${url}`);
-      if (links === null) {
+      if (jobData === null) {
         console.log("Status: FAILED (Returned null)");
-      } else if (links.length === 0) {
-        console.log("Status: SUCCESS (No job links found)");
       } else {
         console.log("Status: SUCCESS");
-        links.forEach((link, index) => {
-          console.log(`  ${index + 1}. ${link}`);
-        });
+        if (jobData.company || jobData.jobRole || jobData.location || jobData.experience) {
+          console.log(`  Company: ${jobData.company || "N/A"}`);
+          console.log(`  Job Role: ${jobData.jobRole || "N/A"}`);
+          console.log(`  Location: ${jobData.location || "N/A"}`);
+          console.log(`  Experience: ${jobData.experience || "N/A"}`);
+        }
+        if (jobData.applyLinks.length === 0) {
+          console.log("  Apply Links: No job links found.");
+        } else {
+          console.log("  Apply Links:");
+          jobData.applyLinks.forEach((link, index) => {
+            console.log(`    ${index + 1}. ${link}`);
+          });
+        }
       }
     }
     console.log("\n========================================================");
