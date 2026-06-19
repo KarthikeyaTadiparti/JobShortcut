@@ -3,8 +3,10 @@
 
 import { chromium } from "playwright";
 import readline from "readline";
+import { fileURLToPath } from "url";
+import path from "path";
 
-async function extractJobLinks(url: string): Promise<string[]> {
+export async function extractJobLinks(url: string): Promise<string[] | null> {
   const browser = await chromium.launch({
     headless: true,
   });
@@ -54,7 +56,7 @@ async function extractJobLinks(url: string): Promise<string[]> {
     return [...new Set(links)];
   } catch (error) {
     console.error(`Failed to scrape ${url}:`, error);
-    return [];
+    return null;
   } finally {
     await browser.close();
   }
@@ -81,6 +83,11 @@ async function main() {
 
         console.log(`\nResults for ${url}:`);
 
+        if (jobLinks === null) {
+          console.log("Failed to scrape.");
+          continue;
+        }
+
         if (jobLinks.length === 0) {
           console.log("No job links found.");
           continue;
@@ -94,4 +101,9 @@ async function main() {
   );
 }
 
-main();
+const filename = fileURLToPath(import.meta.url);
+const isMain = process.argv[1] && path.resolve(process.argv[1]).toLowerCase() === path.resolve(filename).toLowerCase();
+
+if (isMain) {
+  main();
+}

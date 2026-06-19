@@ -13,6 +13,7 @@
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     
+    "scrape": "tsx src/scraper/index.ts",
     "scrape:jobcode": "tsx src/scraper/jobcode_scraper.ts",
     "scrape:freshers": "tsx src/scraper/freshers_scraper.ts",
     "scrape:placement": "tsx src/scraper/placement_officer_scraper.ts"
