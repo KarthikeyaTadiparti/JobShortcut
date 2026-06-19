@@ -16,7 +16,9 @@
     "scrape": "tsx src/scraper/index.ts",
     "scrape:jobcode": "tsx src/scraper/jobcode_scraper.ts",
     "scrape:freshers": "tsx src/scraper/freshers_scraper.ts",
-    "scrape:placement": "tsx src/scraper/placement_officer_scraper.ts"
+    "scrape:placement": "tsx src/scraper/placement_officer_scraper.ts",
+    "scrape:freshershunt": "tsx src/scraper/freshers_hunt_scraper.ts",
+    "scrape:dailypharma": "tsx src/scraper/dailypharmajobs_scraper.ts"
   },
   "keywords": [],
   "author": "",
