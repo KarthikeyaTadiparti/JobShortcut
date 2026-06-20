@@ -1,7 +1,7 @@
 import { pgTable, varchar, bigserial, timestamp } from "drizzle-orm/pg-core";
 
 export const admins = pgTable("admins", {
-  id: bigserial("id", { mode: "bigint" }).primaryKey(),
+  id: bigserial("id", { mode: "number" }).primaryKey(),
   name: varchar("name", { length: 255 }).notNull(),
   email: varchar("email", { length: 255 }).notNull().unique(),
   password: varchar("password", { length: 255 }).notNull(),

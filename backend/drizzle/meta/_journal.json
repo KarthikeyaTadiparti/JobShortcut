@@ -15,6 +15,13 @@
       "when": 1781931149918,
       "tag": "0001_big_monster_badoon",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1781932452651,
+      "tag": "0002_smiling_satana",
+      "breakpoints": true
     }
   ]
 }
