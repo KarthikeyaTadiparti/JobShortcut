@@ -4,12 +4,15 @@ import "dotenv/config";
 import authRouter from "./routes/auth-routes.js";
 import adminRouter from "./routes/admin-routes.js";
 import { errorHandler, handle404Error } from "./middlewares/errorhandler.js";
+import morganMiddleware from "./middlewares/morgan.js";
 
 const app = express();
 
 // Standard middlewares
+app.use(morganMiddleware);
 app.use(express.json());
 app.use(cookieParser());
+
 
 // Home endpoint
 app.get("/", (_req, res) => {
