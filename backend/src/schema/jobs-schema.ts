@@ -1,0 +1,19 @@
+import { pgTable, varchar, timestamp, bigint, bigserial } from "drizzle-orm/pg-core";
+import { admins } from "./admins-schema.js";
+
+export const jobs = pgTable("jobs", {
+  id: bigserial("id", { mode: "bigint" }).primaryKey(),
+  company: varchar("company", { length: 255 }),
+  jobRole: varchar("job_role", { length: 255 }),
+  experience: varchar("experience", { length: 255 }),
+  location: varchar("location", { length: 255 }),
+  applyLink: varchar("apply_link", { length: 512 }).notNull().unique(),
+  
+  adminId: bigint("admin_id", { mode: "bigint" }).notNull().references(() => admins.id, { onDelete: "cascade" }),
+
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type Job = typeof jobs.$inferSelect;
+export type NewJob = typeof jobs.$inferInsert;

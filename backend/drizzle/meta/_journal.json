@@ -8,6 +8,13 @@
       "when": 1781844138024,
       "tag": "0000_shocking_mongoose",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1781931149918,
+      "tag": "0001_big_monster_badoon",
+      "breakpoints": true
     }
   ]
 }

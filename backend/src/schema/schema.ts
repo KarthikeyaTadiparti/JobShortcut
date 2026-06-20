@@ -1,5 +1,7 @@
-import * as users from "./users-schema.js"
+import * as admins from "./admins-schema.js";
+import * as jobs from "./jobs-schema.js";
 
 export const schema = {
-    ...users
-}
+    ...admins,
+    ...jobs
+};
