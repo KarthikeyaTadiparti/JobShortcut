@@ -1,4 +1,4 @@
-const BASE_URL = '/api';
+const BASE_URL = import.meta.env.VITE_API_URL + '/api' || 'http://localhost:3000/api';
 
 export interface RequestOptions extends Omit<RequestInit, 'body'> {
   body?: any;
