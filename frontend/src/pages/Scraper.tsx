@@ -1,28 +1,24 @@
 import { useState, useRef } from 'react'
 import { Button } from '@/components/ui/button'
-import { useDispatch, useSelector } from 'react-redux'
+import { useSelector } from 'react-redux'
 import { type RootState } from '@/redux/reducers'
-import { clearUser } from '@/redux/reducers/auth-reducer'
-import { logoutUser, createJob, startScraperStream } from '@/api'
+import { createJob, startScraperStream } from '@/api'
 import { useMutation } from '@tanstack/react-query'
-import { useNavigate, Navigate } from 'react-router-dom'
+import { Navigate } from 'react-router-dom'
 import {
     Play,
     Loader2,
-    LogOut,
     Globe,
     CheckCircle2,
     XCircle,
     ExternalLink,
     Briefcase,
     MapPin,
-    Award,
-    Terminal,
-    Sun,
-    Moon
+    Award,  
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { useTheme } from 'next-themes'
+import AdminNavbar from '@/components/AdminNavbar'
+import WarningDialog from '@/components/WarningDialog'
 
 
 interface ScrapedJob {
@@ -40,15 +36,10 @@ interface ScrapeLog {
 }
 
 function Scraper() {
-    const dispatch = useDispatch()
-    const navigate = useNavigate()
-    const { userData, isAuthenticated } = useSelector((state: RootState) => state.auth)
+    const { isAuthenticated } = useSelector((state: RootState) => state.auth)
 
-    // Global theme context
-    const { setTheme, resolvedTheme } = useTheme()
-
-    const toggleTheme = () => {
-        setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')
+    if (!isAuthenticated) {
+        return <Navigate to="/login" replace />
     }
 
     // Form and Scraper State
@@ -94,7 +85,6 @@ function Scraper() {
                 return;
             }
             console.error("Failed to approve job:", err);
-            toast.error(err.message || "Failed to approve job.");
         }
     });
 
@@ -137,22 +127,8 @@ function Scraper() {
         rejectMutation.mutate(url);
     }
 
-
-
     // UI refs
     const logEndRef = useRef<HTMLDivElement>(null)
-
-    if (!isAuthenticated) {
-        return <Navigate to="/login" replace />
-    }
-
-    const logoutMutation = useMutation({
-        mutationFn: logoutUser,
-        onSuccess: () => {
-            dispatch(clearUser())
-            navigate('/login')
-        },
-    })
 
     const scrapeMutation = useMutation({
         mutationFn: async (urls: string) => {
@@ -231,48 +207,7 @@ function Scraper() {
     return (
         <div className="min-h-screen bg-background text-foreground font-sans pb-16 transition-colors duration-200">
             {/* Header */}
-            <header className="border-b border-border bg-card/50 backdrop-blur-md sticky top-0 z-50">
-                <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-                    <div className="flex h-16 items-center justify-between">
-                        <div className="flex items-center gap-3">
-                            <div className="rounded-lg bg-indigo-600/10 p-2 text-indigo-400 border border-indigo-500/20">
-                                <Terminal className="h-6 w-6" />
-                            </div>
-                            <span className="text-xl font-bold tracking-tight text-foreground bg-gradient-to-r from-indigo-400 to-violet-400 bg-clip-text text-transparent">
-                                Job Shortcut
-                            </span>
-                        </div>
-                        <div className="flex items-center gap-4">
-                            <Button
-                                onClick={toggleTheme}
-                                variant="ghost"
-                                size="icon"
-                                className="h-9 w-9 rounded-lg border border-border text-foreground hover:bg-secondary cursor-pointer transition-all"
-                                aria-label="Toggle Theme"
-                            >
-                                {resolvedTheme === 'dark' ? (
-                                    <Sun className="h-4 w-4 text-yellow-500" />
-                                ) : (
-                                    <Moon className="h-4 w-4 text-indigo-600" />
-                                )}
-                            </Button>
-                            <div className="hidden md:flex flex-col text-right">
-                                <span className="text-sm font-semibold text-foreground">{userData.name || 'Admin'}</span>
-                                <span className="text-xs text-muted-foreground">{userData.email}</span>
-                            </div>
-                            <Button
-                                onClick={() => logoutMutation.mutate()}
-                                disabled={logoutMutation.isPending}
-                                variant="destructive"
-                                className="cursor-pointer font-medium transition-all gap-2"
-                            >
-                                <LogOut className="h-4 w-4" />
-                                {logoutMutation.isPending ? 'Logging out...' : 'Logout'}
-                            </Button>
-                        </div>
-                    </div>
-                </div>
-            </header>
+            <AdminNavbar />
 
             <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mt-10">
                 <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
@@ -614,30 +549,8 @@ function Scraper() {
 
             {/* Custom Dialog Warning Modal for duplicates */}
             {showDialog && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
-                    <div className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-2xl space-y-4 animate-in zoom-in-95 duration-200">
-                        <div className="flex items-center gap-3 text-red-500">
-                            <XCircle className="h-6 w-6 shrink-0" />
-                            <h3 className="text-lg font-bold text-foreground">Duplicate Job Link</h3>
-                        </div>
-                        <p className="text-sm text-muted-foreground whitespace-pre-wrap break-all">
-                            {dialogMessage}
-                        </p>
-                        <div className="flex justify-end pt-2">
-                            <Button
-                                onClick={() => {
-                                    setShowDialog(false)
-                                    setDialogMessage('')
-                                }}
-                                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-xl text-sm"
-                            >
-                                Dismiss
-                            </Button>
-                        </div>
-                    </div>
-                </div>
+                <WarningDialog dialogMessage={dialogMessage} setShowDialog={setShowDialog} setDialogMessage={setDialogMessage} />
             )}
-            
         </div>
     )
 }
