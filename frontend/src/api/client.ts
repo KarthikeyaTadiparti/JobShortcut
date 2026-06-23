@@ -12,7 +12,7 @@ export async function apiClient<T = any>(endpoint: string, options: RequestOptio
     method: customConfig.method || (body ? 'POST' : 'GET'),
     ...customConfig,
     headers,
-    credentials: 'same-origin',
+    credentials: 'include',
   };
 
   if (body) {

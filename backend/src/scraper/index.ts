@@ -13,6 +13,7 @@ export interface ScrapedJob {
   experience: string | null;
   location: string | null;
   applyLinks: string[];
+  alreadyExists?: boolean;
 }
 
 /**
@@ -48,15 +49,22 @@ export async function scrapeUrl(url: string): Promise<ScrapedJob | null> {
  * Scrapes multiple URLs, gathers results in a Record, and returns them.
  * Failed/Unsupported URLs will have a null value.
  */
-export async function scrapeUrls(urls: string[]): Promise<Record<string, ScrapedJob | null>> {
+export async function scrapeUrls(
+  urls: string[],
+  onProgress?: (url: string, status: "start" | "end", result?: ScrapedJob | null) => void | Promise<void>
+): Promise<Record<string, ScrapedJob | null>> {
   const results: Record<string, ScrapedJob | null> = {};
 
   for (const url of urls) {
     try {
-      results[url] = await scrapeUrl(url);
+      if (onProgress) await onProgress(url, "start");
+      const result = await scrapeUrl(url);
+      results[url] = result;
+      if (onProgress) await onProgress(url, "end", result);
     } catch (error) {
       console.error(`Failed during batch scrape of ${url}:`, error);
       results[url] = null;
+      if (onProgress) await onProgress(url, "end", null);
     }
   }
 
