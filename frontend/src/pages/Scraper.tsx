@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { useSelector } from 'react-redux'
 import { type RootState } from '@/redux/reducers'
@@ -23,6 +23,63 @@ import WarningDialog from '@/components/WarningDialog'
 import CreateJobDialog from '@/components/CreateJobDialog'
 
 
+interface InlineEditProps {
+    value: string;
+    onSave: (newValue: string) => void;
+    placeholder?: string;
+    className?: string;
+    inputClassName?: string;
+}
+
+function InlineEdit({ value, onSave, placeholder = '', className = '', inputClassName = '' }: InlineEditProps) {
+    const [isEditing, setIsEditing] = useState(false);
+    const [editValue, setEditValue] = useState(value);
+
+    useEffect(() => {
+        setEditValue(value);
+    }, [value]);
+
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'Enter') {
+            onSave(editValue);
+            setIsEditing(false);
+        } else if (e.key === 'Escape') {
+            setEditValue(value);
+            setIsEditing(false);
+        }
+    };
+
+    const handleBlur = () => {
+        onSave(editValue);
+        setIsEditing(false);
+    };
+
+    if (isEditing) {
+        return (
+            <input
+                type="text"
+                value={editValue}
+                onChange={(e) => setEditValue(e.target.value)}
+                onKeyDown={handleKeyDown}
+                onBlur={handleBlur}
+                autoFocus
+                placeholder={placeholder}
+                className={`w-full bg-background border border-indigo-500 rounded px-1.5 py-0.5 text-foreground focus:outline-none focus:ring-1 focus:ring-indigo-500 ${inputClassName}`}
+            />
+        );
+    }
+
+    return (
+        <span
+            onDoubleClick={() => setIsEditing(true)}
+            className={`cursor-pointer hover:bg-indigo-500/10 rounded px-1 -mx-1 transition-colors duration-150 select-none ${className}`}
+            title="Double click to edit"
+        >
+            {value || <span className="text-muted-foreground/50 italic">{placeholder || 'Empty'}</span>}
+        </span>
+    );
+}
+
 interface ScrapedJob {
     company: string | null;
     jobRole: string | null;
@@ -43,6 +100,36 @@ function Scraper() {
     if (!isAuthenticated) {
         return <Navigate to="/login" replace />
     }
+
+    const handleUpdateField = (url: string, field: keyof ScrapedJob, newValue: string) => {
+        setResults((prev) => {
+            const currentJob = prev[url];
+            if (!currentJob) return prev;
+            return {
+                ...prev,
+                [url]: {
+                    ...currentJob,
+                    [field]: newValue === '' ? null : newValue,
+                }
+            };
+        });
+    };
+
+    const handleUpdateApplyLink = (url: string, index: number, newValue: string) => {
+        setResults((prev) => {
+            const currentJob = prev[url];
+            if (!currentJob) return prev;
+            const updatedLinks = [...currentJob.applyLinks];
+            updatedLinks[index] = newValue;
+            return {
+                ...prev,
+                [url]: {
+                    ...currentJob,
+                    applyLinks: updatedLinks,
+                }
+            };
+        });
+    };
 
     // Form and Scraper State
     const [urlInput, setUrlInput] = useState('')
@@ -425,45 +512,73 @@ function Scraper() {
                                             }`}
                                     >
                                         <div className="space-y-4">
-                                            {/* Card Top */}
-                                            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 border-b border-border pb-4">
-                                                <div className="min-w-0">
-                                                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${isApproved
-                                                            ? "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400"
-                                                            : isRejected
-                                                                ? "bg-red-500/20 text-red-600 dark:text-red-400"
-                                                                : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                                                        }`}>
-                                                        {isApproved ? 'Approved' : isRejected ? 'Rejected' : 'Scraped'}
-                                                    </span>
-                                                    <h3 className="text-base font-bold text-foreground mt-2 truncate" title={jobData.jobRole || 'Unknown Role'}>
-                                                        {jobData.jobRole || 'Unknown Role'}
-                                                    </h3>
-                                                    <p className="text-sm font-semibold text-indigo-600 dark:text-indigo-400 mt-1 truncate" title={jobData.company || 'Unknown Company'}>
-                                                        {jobData.company || 'Unknown Company'}
-                                                    </p>
-                                                </div>
+                                            {/* Card Top Header */}
+                                            <div className="flex items-center justify-between gap-4">
+                                                <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${isApproved
+                                                        ? "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400"
+                                                        : isRejected
+                                                            ? "bg-red-500/20 text-red-600 dark:text-red-400"
+                                                            : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                                                    }`}>
+                                                    {isApproved ? 'Approved' : isRejected ? 'Rejected' : 'Scraped'}
+                                                </span>
                                                 <a
                                                     href={url}
                                                     target="_blank"
                                                     rel="noopener noreferrer"
-                                                    className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300 font-medium text-xs flex items-center gap-1.5 self-start shrink-0"
+                                                    className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300 font-medium text-xs flex items-center gap-1.5 shrink-0"
                                                 >
                                                     Source <ExternalLink className="h-3.5 w-3.5" />
                                                 </a>
                                             </div>
 
+                                            {/* Job Title & Company (occupies full width) */}
+                                            <div className="space-y-1">
+                                                <h3 className="text-base font-bold text-foreground block w-full" title={jobData.jobRole || 'Unknown Role'}>
+                                                    <InlineEdit
+                                                        value={jobData.jobRole || ''}
+                                                        placeholder="Job Role"
+                                                        onSave={(val) => handleUpdateField(url, 'jobRole', val)}
+                                                        className="block w-full"
+                                                        inputClassName="text-base font-bold w-full"
+                                                    />
+                                                </h3>
+                                                <p className="text-sm font-semibold text-indigo-600 dark:text-indigo-400 block w-full" title={jobData.company || 'Unknown Company'}>
+                                                    <InlineEdit
+                                                        value={jobData.company || ''}
+                                                        placeholder="Company Name"
+                                                        onSave={(val) => handleUpdateField(url, 'company', val)}
+                                                        className="block w-full"
+                                                        inputClassName="text-sm font-semibold text-indigo-600 dark:text-indigo-400 w-full"
+                                                    />
+                                                </p>
+                                            </div>
+
                                             {/* Details Grid */}
                                             <div className="grid grid-cols-1 gap-2.5 text-xs">
-                                                <div className="flex items-center gap-2.5 text-foreground/80">
-                                                    <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
-                                                    <span className="truncate">{jobData.location || 'Not Specified'}</span>
-                                                </div>
-                                                <div className="flex items-center gap-2.5 text-foreground/80">
-                                                    <Award className="h-4 w-4 text-muted-foreground shrink-0" />
-                                                    <span className="truncate">{jobData.experience || 'Not Specified'}</span>
-                                                </div>
-                                            </div>
+                                                 <div className="flex items-center gap-2.5 text-foreground/80 min-w-0">
+                                                     <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
+                                                     <span className="flex-1">
+                                                         <InlineEdit
+                                                             value={jobData.location || ''}
+                                                             placeholder="Location"
+                                                             onSave={(val) => handleUpdateField(url, 'location', val)}
+                                                             className="block w-full"
+                                                         />
+                                                     </span>
+                                                 </div>
+                                                 <div className="flex items-center gap-2.5 text-foreground/80 min-w-0">
+                                                     <Award className="h-4 w-4 text-muted-foreground shrink-0" />
+                                                     <span className="flex-1">
+                                                         <InlineEdit
+                                                             value={jobData.experience || ''}
+                                                             placeholder="Experience"
+                                                             onSave={(val) => handleUpdateField(url, 'experience', val)}
+                                                             className="block w-full"
+                                                         />
+                                                     </span>
+                                                 </div>
+                                             </div>
                                         </div>
 
                                         {/* Apply Links Section */}
@@ -500,7 +615,22 @@ function Scraper() {
                                                                     className="h-3.5 w-3.5 accent-indigo-600 cursor-pointer"
                                                                 />
                                                             </div>
-                                                            <span className="truncate text-left flex-1" title={link}>{link}</span>
+                                                            <span className="truncate text-left flex-1 min-w-0" title={link}>
+                                                                <InlineEdit
+                                                                    value={link}
+                                                                    placeholder="Apply Link"
+                                                                    onSave={(val) => {
+                                                                        if (val.trim()) {
+                                                                            handleUpdateApplyLink(url, idx, val.trim());
+                                                                            if (isSelected) {
+                                                                                setSelectedLinks((prev) => ({ ...prev, [url]: val.trim() }));
+                                                                            }
+                                                                        }
+                                                                    }}
+                                                                    className="block w-full truncate"
+                                                                    inputClassName="text-[11px]"
+                                                                />
+                                                            </span>
                                                             <a
                                                                 href={link}
                                                                 target="_blank"
