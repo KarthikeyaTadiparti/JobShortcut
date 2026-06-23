@@ -21,7 +21,7 @@ export async function extractJobLinks(url: string): Promise<ScrapedJob | null> {
   const page = await browser.newPage();
 
   try {
-    console.log(`Scraping: ${url}`);
+    // console.log(`Scraping: ${url}`);
 
     await page.goto(url, {
       waitUntil: "networkidle",
