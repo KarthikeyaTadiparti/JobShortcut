@@ -20,8 +20,13 @@ export const createJobHandler = wrapAsync(async (req: Request, res: Response) =>
         throw new ExpressError(401, "Admin must be logged in to approve jobs");
     }
 
+    let formattedApplyLink = applyLink.trim();
+    if (!formattedApplyLink.endsWith("/")) {
+        formattedApplyLink += "/";
+    }
+
     // Check if the apply link already exists in the database
-    const exists = await checkApplyLinkExists(applyLink);
+    const exists = await checkApplyLinkExists(formattedApplyLink);
     if (exists) {
         throw new ExpressError(409, "Job already exists in the database");
     }
@@ -31,7 +36,7 @@ export const createJobHandler = wrapAsync(async (req: Request, res: Response) =>
         jobRole: jobRole || null,
         experience: experience || null,
         location: location || null,
-        applyLink,
+        applyLink: formattedApplyLink,
         addedBy,
     });
 
