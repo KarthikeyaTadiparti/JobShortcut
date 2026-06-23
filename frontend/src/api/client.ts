@@ -23,8 +23,11 @@ export async function apiClient<T = any>(endpoint: string, options: RequestOptio
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.message || `Request failed with status ${response.status}`);
+    const error = new Error(errorData.message || `Request failed with status ${response.status}`) as any;
+    error.status = response.status;
+    throw error;
   }
+
 
   return response.json();
 }

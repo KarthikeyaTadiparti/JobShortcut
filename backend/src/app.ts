@@ -9,6 +9,7 @@ import { errorHandler, handle404Error } from "./middlewares/errorhandler.js";
 import authRouter from "./routes/auth-routes.js";
 import adminRouter from "./routes/admin-routes.js";
 import scraperRouter from "./routes/scraper-routes.js";
+import jobsRouter from "./routes/jobs-routes.js";
 
 const app = express();
 
@@ -33,6 +34,7 @@ app.get("/", (_req, res) => {
 app.use("/api/auth", authRouter);
 app.use("/api/admins", adminRouter);
 app.use("/api/scrapers", scraperRouter);
+app.use("/api/jobs", jobsRouter);
 
 // 404 Error handler
 app.use(handle404Error);

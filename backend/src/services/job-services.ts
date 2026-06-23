@@ -1,13 +1,14 @@
 import db from "../config/db.js";
 import { jobs } from "../schema/jobs-schema.js";
-import { inArray } from "drizzle-orm";
+import type { Job, NewJob } from "../schema/jobs-schema.js";
+import { eq } from "drizzle-orm";
 
 /**
- * Checks if any of the provided apply links already exist in the jobs table.
- * Returns true if at least one exists, false otherwise.
+ * Checks if the provided apply link already exists in the jobs table.
+ * Returns true if it exists, false otherwise.
  */
-export async function checkApplyLinksExist(applyLinks: string[]): Promise<boolean> {
-    if (!applyLinks || applyLinks.length === 0) {
+export async function checkApplyLinkExists(applyLink: string): Promise<boolean> {
+    if (!applyLink) {
         return false;
     }
 
@@ -15,11 +16,22 @@ export async function checkApplyLinksExist(applyLinks: string[]): Promise<boolea
         const existing = await db
             .select({ id: jobs.id })
             .from(jobs)
-            .where(inArray(jobs.applyLink, applyLinks));
+            .where(eq(jobs.applyLink, applyLink));
         
         return existing.length > 0;
     } catch (error) {
-        console.error("Error checking apply links existence in db:", error);
+        console.error("Error checking apply link existence in db:", error);
         return false;
     }
+}
+
+/**
+ * Inserts a new job record into the jobs table.
+ */
+export async function createJob(data: NewJob): Promise<Job> {
+    const [newJob] = await db.insert(jobs).values(data).returning();
+    if (!newJob) {
+        throw new Error("Failed to create job");
+    }
+    return newJob;
 }
