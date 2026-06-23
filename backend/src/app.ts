@@ -2,10 +2,13 @@ import express from "express";
 import cookieParser from "cookie-parser";
 import cors from "cors";
 import "dotenv/config";
+import morganMiddleware from "./middlewares/morgan.js";
+import { errorHandler, handle404Error } from "./middlewares/errorhandler.js";
+
+// Route imports
 import authRouter from "./routes/auth-routes.js";
 import adminRouter from "./routes/admin-routes.js";
-import { errorHandler, handle404Error } from "./middlewares/errorhandler.js";
-import morganMiddleware from "./middlewares/morgan.js";
+import scraperRouter from "./routes/scraper-routes.js";
 
 const app = express();
 
@@ -29,6 +32,7 @@ app.get("/", (_req, res) => {
 // Route mountings
 app.use("/api/auth", authRouter);
 app.use("/api/admins", adminRouter);
+app.use("/api/scrapers", scraperRouter);
 
 // 404 Error handler
 app.use(handle404Error);
