@@ -6,6 +6,8 @@ import { PersistGate } from 'redux-persist/integration/react'
 import { Provider } from "react-redux";
 import { BrowserRouter as Router } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { Toaster } from "@/components/ui/sonner";
+import { ThemeProvider } from "next-themes";
 
 const queryClient = new QueryClient();
 
@@ -14,7 +16,10 @@ createRoot(document.getElementById("root")!).render(
     <QueryClientProvider client={queryClient}>
       <Router>
         <PersistGate loading={null} persistor={persistor}>
-          <App />
+          <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+            <App />
+            <Toaster />
+          </ThemeProvider>
         </PersistGate>
       </Router>
     </QueryClientProvider>
