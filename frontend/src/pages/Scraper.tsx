@@ -15,10 +15,12 @@ import {
     Briefcase,
     MapPin,
     Award,  
+    Plus,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import AdminNavbar from '@/components/AdminNavbar'
 import WarningDialog from '@/components/WarningDialog'
+import CreateJobDialog from '@/components/CreateJobDialog'
 
 
 interface ScrapedJob {
@@ -61,6 +63,7 @@ function Scraper() {
     // Dialog modal state
     const [showDialog, setShowDialog] = useState(false)
     const [dialogMessage, setDialogMessage] = useState('')
+    const [showCreateDialog, setShowCreateDialog] = useState(false)
 
     const approveMutation = useMutation({
         mutationFn: async ({ jobData, selectedLink }: { url: string; jobData: ScrapedJob; selectedLink: string }) => {
@@ -210,6 +213,23 @@ function Scraper() {
             <AdminNavbar />
 
             <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mt-10">
+                {/* Page Header */}
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+                    <div>
+                        <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">Job Scraper</h1>
+                        <p className="text-sm text-muted-foreground mt-1">
+                            Extract jobs automatically or add them manually to your tracker database.
+                        </p>
+                    </div>
+                    <Button
+                        onClick={() => setShowCreateDialog(true)}
+                        className="cursor-pointer bg-indigo-600 hover:bg-indigo-500 text-white font-medium gap-2 px-4 py-5 rounded-lg transition-all self-start sm:self-center"
+                    >
+                        <Plus className="h-4 w-4" />
+                        Create Job
+                    </Button>
+                </div>
+
                 <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
 
                     {/* Left Column: Form Controls */}
@@ -556,6 +576,9 @@ function Scraper() {
             {showDialog && (
                 <WarningDialog dialogMessage={dialogMessage} setShowDialog={setShowDialog} setDialogMessage={setDialogMessage} />
             )}
+
+            {/* Create Job Manual Dialog Modal */}
+            <CreateJobDialog isOpen={showCreateDialog} onClose={() => setShowCreateDialog(false)} />
         </div>
     )
 }
