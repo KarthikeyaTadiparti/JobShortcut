@@ -171,7 +171,6 @@ function Scraper() {
             if (err && err.status === 409) {
                 setDialogMessage(`This job link already exists in the database:\n${variables.selectedLink}`);
                 setShowDialog(true);
-                toast.error("This job link already exists in the database.");
                 return;
             }
             console.error("Failed to approve job:", err);
