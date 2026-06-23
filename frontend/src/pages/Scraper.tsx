@@ -214,7 +214,7 @@ function Scraper() {
 
                     {/* Left Column: Form Controls */}
                     <div className="lg:col-span-5 space-y-6">
-                        <div className="rounded-2xl border border-border bg-card/30 p-6 shadow-xl backdrop-blur-sm">
+                        <div className="rounded-2xl border border-border bg-card/30 dark:bg-card/80 p-6 shadow-xl backdrop-blur-sm">
                             <h2 className="text-lg font-bold text-foreground mb-2">Scrape Jobs</h2>
                             <p className="text-xs text-muted-foreground mb-4">
                                 Enter job URLs from supported sites separated by commas.
@@ -290,7 +290,7 @@ function Scraper() {
                     <div className="lg:col-span-7 space-y-6">
 
                         {/* Progress and Live Loader Block */}
-                        <div className="rounded-2xl border border-border bg-card/30 p-6 shadow-xl backdrop-blur-sm space-y-4">
+                        <div className="rounded-2xl border border-border bg-card/30 dark:bg-card/80 p-6 shadow-xl backdrop-blur-sm space-y-4">
                             <div className="flex justify-between items-center">
                                 <h3 className="text-sm font-bold text-foreground">Scraping Progress</h3>
                                 <span className="text-xs font-mono text-muted-foreground">
@@ -306,12 +306,17 @@ function Scraper() {
                                 />
                             </div>
 
-                            
+                            {currentlyScraping && (
+                                <div className="text-xs text-muted-foreground flex items-center gap-2 animate-pulse">
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin text-indigo-500" />
+                                    <span>Currently scraping: <span className="font-mono text-[11px] text-foreground font-medium">{currentlyScraping}</span></span>
+                                </div>
+                            )}
 
                             {/* Live Activity Logs */}
                             <div className="border-t border-border pt-4">
                                 <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Live Scrape Feed</h4>
-                                <div className="max-h-40 overflow-y-auto space-y-2 rounded-xl bg-background p-3 border border-border font-mono text-[11px] scrollbar-thin">
+                                <div className="max-h-40 overflow-y-auto space-y-2 rounded-xl bg-background dark:bg-black/25 p-3 border border-border font-mono text-[11px] scrollbar-thin">
                                     {logs.map((log, index) => (
                                         <div key={index} className="flex items-start justify-between gap-4 py-0.5">
                                             <span className="text-muted-foreground truncate">{log.url}</span>
@@ -356,7 +361,7 @@ function Scraper() {
                             {Object.entries(results).map(([url, jobData]) => {
                                 if (jobData === null) {
                                     return (
-                                        <div key={url} className="rounded-xl border border-red-500/20 bg-red-500/5 p-5 shadow-md flex items-start gap-4 h-full">
+                                        <div key={url} className="rounded-xl border border-red-500/20 bg-red-500/5 dark:bg-red-950/15 p-5 shadow-md flex items-start gap-4 h-full">
                                             <div className="rounded-lg bg-red-500/10 p-2 text-red-400 shrink-0">
                                                 <XCircle className="h-5 w-5" />
                                             </div>
@@ -393,10 +398,10 @@ function Scraper() {
                                     <div
                                         key={url}
                                         className={`rounded-xl border p-6 shadow-md hover:shadow-lg transition-all flex flex-col justify-between space-y-4 h-full ${isApproved
-                                                ? "border-emerald-500/30 bg-emerald-500/5 dark:bg-emerald-950/10"
+                                                ? "border-emerald-500/30 bg-emerald-500/5 dark:bg-emerald-950/20"
                                                 : isRejected
-                                                    ? "border-red-500/20 bg-red-500/5 dark:bg-red-950/10 opacity-60"
-                                                    : "border-border bg-card/40 hover:border-border/80"
+                                                    ? "border-red-500/20 bg-red-500/5 dark:bg-red-950/20 opacity-60"
+                                                    : "border-border bg-card/40 dark:bg-card/80 hover:border-border/80 dark:hover:border-indigo-500/30"
                                             }`}
                                     >
                                         <div className="space-y-4">
@@ -451,7 +456,7 @@ function Scraper() {
                                                     (Only 1 approved)
                                                 </span>
                                             </h4>
-                                            <div className="flex flex-col gap-1 max-h-32 overflow-y-auto pr-1.5 scrollbar-thin rounded-lg border border-border bg-background p-1">
+                                            <div className="flex flex-col gap-1 max-h-32 overflow-y-auto pr-1.5 scrollbar-thin rounded-lg border border-border bg-background dark:bg-black/25 p-1">
                                                 {jobData.applyLinks.map((link, idx) => {
                                                     const isSelected = selectedLinks[url]
                                                         ? selectedLinks[url] === link
