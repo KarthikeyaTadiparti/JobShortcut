@@ -18,7 +18,10 @@ import {
     Filter,
     Sparkles,
     Menu,
-    X
+    X,
+    Home,
+    Settings,
+    Users
 } from 'lucide-react'
 import { getJobs } from '@/api'
 import { toast } from 'sonner'
@@ -153,6 +156,17 @@ function UserJobs() {
         return () => window.removeEventListener('resize', handleResize)
     }, [])
 
+    useEffect(() => {
+        if (mobileMenuOpen) {
+            document.body.style.overflow = 'hidden'
+        } else {
+            document.body.style.overflow = ''
+        }
+        return () => {
+            document.body.style.overflow = ''
+        }
+    }, [mobileMenuOpen])
+
     // Search state
     const [searchInput, setSearchInput] = useState('')
     const [locationInput, setLocationInput] = useState('')
@@ -235,48 +249,110 @@ function UserJobs() {
                         className="lg:hidden p-2 rounded-xl text-[#5B6475] hover:text-[#5B3DF5] hover:bg-[#5B3DF5]/5 transition-all cursor-pointer"
                         aria-label="Toggle Mobile Menu"
                     >
-                        {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+                        <Menu className="h-6 w-6" />
                     </button>
                 </div>
 
-                {/* Mobile Dropdown Menu Drawer */}
+                {/* Mobile Dropdown Menu Drawer (Full screen overlay matching image layout) */}
                 <AnimatePresence>
                     {mobileMenuOpen && (
                         <motion.div
-                            initial={{ opacity: 0, y: -15 }}
+                            initial={{ opacity: 0, y: -20 }}
                             animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -15 }}
-                            transition={{ duration: 0.2 }}
-                            className="absolute top-16 left-0 w-full bg-[#FCFAFF]/95 backdrop-blur-xl border-b border-[#EBE3FF] px-6 py-6 flex flex-col gap-3 text-center lg:hidden shadow-xl"
+                            exit={{ opacity: 0, y: -20 }}
+                            transition={{ duration: 0.3, ease: "easeOut" }}
+                            className="fixed inset-0 w-full h-screen bg-gradient-to-b from-[#FCFAFF] via-[#FCFAFF] to-[#EBE3FF]/40 z-[100] px-6 py-6 flex flex-col justify-between lg:hidden overflow-y-auto"
                         >
-                            <a 
-                                href="#hero-section" 
-                                onClick={() => setMobileMenuOpen(false)}
-                                className="text-[15px] font-bold text-[#111827] hover:text-[#5B3DF5] py-3 px-4 rounded-xl bg-white border border-[#EBE3FF] hover:border-[#5B3DF5]/30 hover:bg-[#5B3DF5]/5 active:bg-[#5B3DF5]/10 transition-all shadow-sm flex items-center justify-center gap-2"
-                            >
-                                Home
-                            </a>
-                            <a 
-                                href="#jobs-section" 
-                                onClick={() => setMobileMenuOpen(false)}
-                                className="text-[15px] font-bold text-[#111827] hover:text-[#5B3DF5] py-3 px-4 rounded-xl bg-white border border-[#EBE3FF] hover:border-[#5B3DF5]/30 hover:bg-[#5B3DF5]/5 active:bg-[#5B3DF5]/10 transition-all shadow-sm flex items-center justify-center gap-2"
-                            >
-                                Job Opportunities
-                            </a>
-                            <a 
-                                href="#" 
-                                onClick={() => setMobileMenuOpen(false)}
-                                className="text-[15px] font-bold text-[#111827] hover:text-[#5B3DF5] py-3 px-4 rounded-xl bg-white border border-[#EBE3FF] hover:border-[#5B3DF5]/30 hover:bg-[#5B3DF5]/5 active:bg-[#5B3DF5]/10 transition-all shadow-sm flex items-center justify-center gap-2"
-                            >
-                                How it works
-                            </a>
-                            <a 
-                                href="#" 
-                                onClick={() => setMobileMenuOpen(false)}
-                                className="text-[15px] font-bold text-[#111827] hover:text-[#5B3DF5] py-3 px-4 rounded-xl bg-white border border-[#EBE3FF] hover:border-[#5B3DF5]/30 hover:bg-[#5B3DF5]/5 active:bg-[#5B3DF5]/10 transition-all shadow-sm flex items-center justify-center gap-2"
-                            >
-                                About us
-                            </a>
+                            {/* Header row in full overlay */}
+                            <div className="w-full flex items-center justify-between h-16">
+                                <a 
+                                    href="#" 
+                                    onClick={() => setMobileMenuOpen(false)} 
+                                    className="flex items-center gap-3 text-xl font-black text-[#111827]"
+                                >
+                                    <img src="/jobshortcut_logo.svg" alt="Job Shortcut Logo" className="h-8 w-auto object-contain" />
+                                    <span>Job <span className="text-[#5B3DF5]">Shortcut</span></span>
+                                </a>
+                                <button 
+                                    onClick={() => setMobileMenuOpen(false)}
+                                    className="p-2 rounded-xl text-[#5B6475] hover:text-[#5B3DF5] hover:bg-[#5B3DF5]/5 transition-all cursor-pointer"
+                                    aria-label="Close Mobile Menu"
+                                >
+                                    <X className="h-6 w-6" />
+                                </button>
+                            </div>
+
+                            {/* Menu Options (Vertical list matching user image style) */}
+                            <div className="flex flex-col w-full mt-6 gap-2">
+                                {/* Option 1: Home (Active highlight style) */}
+                                <a 
+                                    href="#hero-section" 
+                                    onClick={() => setMobileMenuOpen(false)}
+                                    className="flex items-center gap-4 w-full p-3 rounded-2xl bg-[#5B3DF5]/5 text-[#111827] transition-all hover:bg-[#5B3DF5]/10 active:bg-[#5B3DF5]/15"
+                                >
+                                    <div className="p-2.5 rounded-xl bg-[#5B3DF5]/10 text-[#5B3DF5]">
+                                        <Home className="h-5 w-5" />
+                                    </div>
+                                    <span className="text-[16px] font-bold">Home</span>
+                                </a>
+
+                                <div className="h-[1px] w-[95%] bg-[#EBE3FF] opacity-50 mx-auto"></div>
+
+                                {/* Option 2: Job Opportunities */}
+                                <a 
+                                    href="#jobs-section" 
+                                    onClick={() => setMobileMenuOpen(false)}
+                                    className="flex items-center gap-4 w-full p-3 rounded-2xl text-[#111827] transition-all hover:bg-[#5B3DF5]/5 active:bg-[#5B3DF5]/10"
+                                >
+                                    <div className="p-2.5 rounded-xl bg-[#5B3DF5]/10 text-[#5B3DF5]">
+                                        <Search className="h-5 w-5" />
+                                    </div>
+                                    <span className="text-[16px] font-bold">Job Opportunities</span>
+                                </a>
+
+                                <div className="h-[1px] w-[95%] bg-[#EBE3FF] opacity-50 mx-auto my-1"></div>
+
+                                {/* Option 3: How it works */}
+                                <a 
+                                    href="#" 
+                                    onClick={() => setMobileMenuOpen(false)}
+                                    className="flex items-center gap-4 w-full p-3 rounded-2xl text-[#111827] transition-all hover:bg-[#5B3DF5]/5 active:bg-[#5B3DF5]/10"
+                                >
+                                    <div className="p-2.5 rounded-xl bg-[#5B3DF5]/10 text-[#5B3DF5]">
+                                        <Settings className="h-5 w-5" />
+                                    </div>
+                                    <span className="text-[16px] font-bold">How It Works</span>
+                                </a>
+
+                                <div className="h-[1px] w-[95%] bg-[#EBE3FF] opacity-50 mx-auto my-1"></div>
+
+                                {/* Option 4: About us */}
+                                <a 
+                                    href="#" 
+                                    onClick={() => setMobileMenuOpen(false)}
+                                    className="flex items-center gap-4 w-full p-3 rounded-2xl text-[#111827] transition-all hover:bg-[#5B3DF5]/5 active:bg-[#5B3DF5]/10"
+                                >
+                                    <div className="p-2.5 rounded-xl bg-[#5B3DF5]/10 text-[#5B3DF5]">
+                                        <Users className="h-5 w-5" />
+                                    </div>
+                                    <span className="text-[16px] font-bold">About Us</span>
+                                </a>
+                            </div>
+
+                            {/* CTA Action button at bottom */}
+                            <div className="w-full mt-auto mb-6 pt-6">
+                                <a 
+                                    href="#jobs-section"
+                                    onClick={() => setMobileMenuOpen(false)}
+                                    className="w-full bg-[#5B3DF5] text-white py-4 px-6 rounded-2xl flex items-center justify-between font-bold text-[16px] shadow-lg shadow-[#5B3DF5]/30 hover:bg-[#492EE0] active:scale-[0.98] transition-all"
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <Briefcase className="h-5 w-5" />
+                                        <span>Find Jobs Smarter</span>
+                                    </div>
+                                    <ArrowRight className="h-5 w-5" />
+                                </a>
+                            </div>
                         </motion.div>
                     )}
                 </AnimatePresence>
