@@ -1,27 +1,31 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useSelector } from 'react-redux'
 import { type RootState } from '@/redux/reducers'
-import Login from '@/pages/Login'
-import Scraper from './pages/Scraper'
+import AdminLogin from '@/pages/AdminLogin'
+import AdminScraper from './pages/AdminScraper'
+import UserJobs from './pages/UserJobs'
 
-function Home() {
-  
+function Admin() {
+
   const { isAuthenticated } = useSelector((state: RootState) => state.auth)
 
   if (!isAuthenticated) {
-    return <Navigate to="/login" replace />
+    return <Navigate to="/admin/login" replace />
   }
 
-  return <Navigate to="/scraper" replace />
+  return <Navigate to="/admin/scraper" replace />
 
 }
 
 function App() {
   return (
     <Routes>
-      <Route path="/login" element={<Login />} />
-      <Route path="/scraper" element={<Scraper />} />
-      <Route path="/" element={<Home />} />
+      <Route path="/admin" element={<Admin />} />
+      <Route path="/admin/login" element={<AdminLogin />} />
+      <Route path="/admin/scraper" element={<AdminScraper />} />
+      
+      <Route path="/" element={<UserJobs />} />
+
       {/* Catch-all route */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

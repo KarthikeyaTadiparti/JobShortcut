@@ -1,7 +1,8 @@
 import db from "../config/db.js";
 import { jobs } from "../schema/jobs-schema.js";
 import type { Job, NewJob } from "../schema/jobs-schema.js";
-import { eq } from "drizzle-orm";
+import { eq, ilike, or, and, not, desc } from "drizzle-orm";
+
 
 /**
  * Checks if the provided apply link already exists in the jobs table.
@@ -35,3 +36,65 @@ export async function createJob(data: NewJob): Promise<Job> {
     }
     return newJob;
 }
+
+/**
+ * Retrieves a list of jobs from the database based on optional filters:
+ * - search: search term in jobRole or company
+ * - location: location search term
+ * - filterType: "freshers", "experienced", or "remote"
+ */
+export async function getJobsList(filters: { search?: string | undefined; location?: string | undefined; filterType?: string | undefined }): Promise<Job[]> {
+    const query = db.select().from(jobs);
+    const conditions = [];
+
+    if (filters.search) {
+        conditions.push(
+            or(
+                ilike(jobs.jobRole, `%${filters.search}%`),
+                ilike(jobs.company, `%${filters.search}%`)
+            )
+        );
+    }
+
+    if (filters.location) {
+        conditions.push(ilike(jobs.location, `%${filters.location}%`));
+    }
+
+    if (filters.filterType === "freshers") {
+        conditions.push(
+            or(
+                ilike(jobs.experience, "%fresher%"),
+                ilike(jobs.experience, "%0-%"),
+                ilike(jobs.experience, "% 0 %"),
+                ilike(jobs.experience, "%0 year%"),
+                ilike(jobs.jobRole, "%fresher%"),
+                ilike(jobs.jobRole, "%intern%")
+            )
+        );
+    } else if (filters.filterType === "experienced") {
+        conditions.push(
+            and(
+                not(ilike(jobs.experience, "%fresher%")),
+                not(ilike(jobs.experience, "%0-%")),
+                not(ilike(jobs.experience, "%0 year%")),
+                not(ilike(jobs.jobRole, "%intern%"))
+            )
+        );
+    } else if (filters.filterType === "remote") {
+        conditions.push(
+            or(
+                ilike(jobs.location, "%remote%"),
+                ilike(jobs.location, "%wfh%"),
+                ilike(jobs.location, "%work from home%")
+            )
+        );
+    }
+
+    if (conditions.length > 0) {
+        // @ts-ignore
+        return query.where(and(...conditions)).orderBy(desc(jobs.createdAt));
+    }
+
+    return query.orderBy(desc(jobs.createdAt));
+}
+

@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
 import wrapAsync from "../utils/wrap-async.js";
-import { createJob, checkApplyLinkExists } from "../services/job-services.js";
+import { createJob, checkApplyLinkExists, getJobsList } from "../services/job-services.js";
 import ExpressError from "../middlewares/errorhandler.js";
 
 export const createJobHandler = wrapAsync(async (req: Request, res: Response) => {
@@ -46,3 +46,19 @@ export const createJobHandler = wrapAsync(async (req: Request, res: Response) =>
         message: "Job approved and saved successfully",
     });
 });
+
+export const getJobsHandler = wrapAsync(async (req: Request, res: Response) => {
+    const { search, location, filterType } = req.query;
+
+    const data = await getJobsList({
+        search: typeof search === "string" ? search : undefined,
+        location: typeof location === "string" ? location : undefined,
+        filterType: typeof filterType === "string" ? filterType : undefined,
+    });
+
+    return res.status(200).json({
+        status: true,
+        data,
+    });
+});
+
