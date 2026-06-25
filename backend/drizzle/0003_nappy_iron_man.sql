@@ -1,0 +1,1 @@
+ALTER TABLE "jobs" ALTER COLUMN "apply_link" SET DATA TYPE text;

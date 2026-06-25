@@ -1,4 +1,4 @@
-import { pgTable, varchar, timestamp, bigint, bigserial } from "drizzle-orm/pg-core";
+import { pgTable, varchar, timestamp, bigint, bigserial, text } from "drizzle-orm/pg-core";
 import { admins } from "./admins-schema.js";
 
 export const jobs = pgTable("jobs", {
@@ -7,7 +7,7 @@ export const jobs = pgTable("jobs", {
   jobRole: varchar("job_role", { length: 255 }),
   experience: varchar("experience", { length: 255 }),
   location: varchar("location", { length: 255 }),
-  applyLink: varchar("apply_link", { length: 512 }).notNull().unique(),
+  applyLink: text("apply_link").notNull().unique(),
   
   addedBy: bigint("added_by", { mode: "number" }).notNull().references(() => admins.id, { onDelete: "cascade" }),
 

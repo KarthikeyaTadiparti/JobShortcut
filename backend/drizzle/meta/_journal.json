@@ -22,6 +22,13 @@
       "when": 1781932452651,
       "tag": "0002_smiling_satana",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1782391261779,
+      "tag": "0003_nappy_iron_man",
+      "breakpoints": true
     }
   ]
 }
