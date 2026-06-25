@@ -1,7 +1,7 @@
 import db from "../config/db.js";
 import { jobs } from "../schema/jobs-schema.js";
 import type { Job, NewJob } from "../schema/jobs-schema.js";
-import { eq, ilike, or, and, not, desc } from "drizzle-orm";
+import { eq, ilike, or, and, not, desc, isNull } from "drizzle-orm";
 
 
 /**
@@ -64,20 +64,37 @@ export async function getJobsList(filters: { search?: string | undefined; locati
         conditions.push(
             or(
                 ilike(jobs.experience, "%fresher%"),
+                ilike(jobs.experience, "%entry%"),
                 ilike(jobs.experience, "%0-%"),
                 ilike(jobs.experience, "% 0 %"),
                 ilike(jobs.experience, "%0 year%"),
-                ilike(jobs.jobRole, "%fresher%"),
                 ilike(jobs.jobRole, "%intern%")
             )
         );
     } else if (filters.filterType === "experienced") {
         conditions.push(
             and(
-                not(ilike(jobs.experience, "%fresher%")),
-                not(ilike(jobs.experience, "%0-%")),
-                not(ilike(jobs.experience, "%0 year%")),
-                not(ilike(jobs.jobRole, "%intern%"))
+                or(
+                    isNull(jobs.experience),
+                    or(
+                        ilike(jobs.experience, "%experienced%"),
+                        ilike(jobs.experience, "%0-2%"),
+                        ilike(jobs.experience, "%0-3%"),
+                        ilike(jobs.experience, "%0-4%"),
+                        ilike(jobs.experience, "%0-5%"),
+                        ilike(jobs.experience, "%0-6%")
+                    ),
+                    and(
+                        not(ilike(jobs.experience, "%fresher%")),
+                        not(ilike(jobs.experience, "%0-%")),
+                        not(ilike(jobs.experience, "% 0 %")),
+                        not(ilike(jobs.experience, "%0 year%"))
+                    )
+                ),
+                or(
+                    isNull(jobs.jobRole),
+                    not(ilike(jobs.jobRole, "%intern%"))
+                )
             )
         );
     } else if (filters.filterType === "remote") {
