@@ -27,7 +27,7 @@ export async function scrapeUrl(url: string): Promise<ScrapedJob | null> {
 
     if (hostname.includes("jobcode.in")) {
       return await scrapeJobcode(url);
-    } else if (hostname.includes("freshersrecruitment.co.in") || hostname.includes("freshersvoice.com")) {
+    } else if (hostname.includes("freshersrecruitment.co.in") || hostname.includes("freshersvoice.com") || hostname.includes("fvoice.site")|| hostname.includes("fresheropenings.com") || hostname.includes("fresherscareers.co.in")) {
       return await scrapeFreshers(url);
     } else if (hostname.includes("placement-officer.com")) {
       return await scrapePlacement(url);

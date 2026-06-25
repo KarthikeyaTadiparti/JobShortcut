@@ -1,9 +1,6 @@
 //https://www.placement-officer.com/
 
 import { chromium } from "playwright";
-import readline from "readline";
-import { fileURLToPath } from "url";
-import path from "path";
 
 export interface ScrapedJob {
   company: string | null;
@@ -21,8 +18,6 @@ export async function extractJobLinks(url: string): Promise<ScrapedJob | null> {
   const page = await browser.newPage();
 
   try {
-    // console.log(`Scraping: ${url}`);
-
     await page.goto(url, {
       waitUntil: "networkidle",
       timeout: 60000,
