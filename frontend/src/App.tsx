@@ -4,6 +4,7 @@ import { type RootState } from '@/redux/reducers'
 import AdminLogin from '@/pages/AdminLogin'
 import AdminScraper from './pages/AdminScraper'
 import UserJobs from './pages/UserJobs'
+import UserHome from './pages/UserHome'
 
 function Admin() {
 
@@ -24,7 +25,8 @@ function App() {
       <Route path="/admin/login" element={<AdminLogin />} />
       <Route path="/admin/scraper" element={<AdminScraper />} />
       
-      <Route path="/" element={<UserJobs />} />
+      <Route path="/" element={<UserHome />} />
+      <Route path="/jobs" element={<UserJobs />} />
 
       {/* Catch-all route */}
       <Route path="*" element={<Navigate to="/" replace />} />

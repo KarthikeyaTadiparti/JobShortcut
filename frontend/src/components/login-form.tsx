@@ -34,7 +34,7 @@ export function LoginForm({
     onSuccess: (data) => {
       if (data?.admin) {
         dispatch(setUser(data.admin))
-        navigate("/")
+        navigate("/admin/scraper")
       }
     },
   })
