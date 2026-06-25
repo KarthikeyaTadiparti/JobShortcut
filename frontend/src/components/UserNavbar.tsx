@@ -181,7 +181,7 @@ function UserNavbar() {
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -20 }}
                         transition={{ duration: 0.3, ease: "easeOut" }}
-                        className="fixed inset-0 w-full h-screen bg-gradient-to-b from-[#FCFAFF] via-[#FCFAFF] to-[#EBE3FF]/40 z-[100] px-6 py-6 flex flex-col justify-between lg:hidden overflow-y-auto"
+                        className="fixed inset-0 w-full h-screen bg-linear-to-b from-[#FCFAFF] via-[#FCFAFF] to-[#EBE3FF]/40 z-100 px-6 py-6 flex flex-col justify-between lg:hidden overflow-y-auto"
                     >
                         {/* Header row in full overlay */}
                         <div className="w-full flex items-center justify-between h-16">
@@ -216,7 +216,7 @@ function UserNavbar() {
                                 <span className="text-[16px] font-bold">Home</span>
                             </Link>
 
-                            <div className="h-[1px] w-[95%] bg-[#EBE3FF] opacity-50 mx-auto"></div>
+                            <div className="h-px w-[95%] bg-[#EBE3FF] opacity-50 mx-auto"></div>
 
                             {/* Option 2: Job Opportunities */}
                             <Link 
@@ -230,7 +230,7 @@ function UserNavbar() {
                                 <span className="text-[16px] font-bold">Job Opportunities</span>
                             </Link>
 
-                            <div className="h-[1px] w-[95%] bg-[#EBE3FF] opacity-50 mx-auto my-1"></div>
+                            <div className="h-px w-[95%] bg-[#EBE3FF] opacity-50 mx-auto my-1"></div>
 
                             {/* Option 3: How it works */}
                             <a 
@@ -244,7 +244,7 @@ function UserNavbar() {
                                 <span className="text-[16px] font-bold">How It Works</span>
                             </a>
 
-                            <div className="h-[1px] w-[95%] bg-[#EBE3FF] opacity-50 mx-auto my-1"></div>
+                            <div className="h-px w-[95%] bg-[#EBE3FF] opacity-50 mx-auto my-1"></div>
 
                             {/* Option 4: About us */}
                             <a 

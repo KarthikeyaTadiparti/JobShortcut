@@ -80,7 +80,7 @@ function UserHome() {
             <UserNavbar />
 
             {/* Main Content Area containing the Hero Section */}
-            <main className="flex-grow">
+            <main className="grow">
                 {/* Hero wrapper with Backdrop background shifted up under the sticky header */}
                 <div 
                     className="w-full relative bg-[#FCFAFF] -mt-16"
@@ -116,7 +116,7 @@ function UserHome() {
                                     variants={fadeUpVariants}
                                     className="text-[clamp(2.2rem,5vw,3.6rem)] leading-[1.05] font-black text-[#111827] tracking-tighter"
                                 >
-                                    One <span className="bg-clip-text text-transparent bg-gradient-to-r from-[#4F46E5] to-[#7C3AED]">Dashboard</span><br />
+                                    One <span className="bg-clip-text text-transparent bg-linear-to-r from-[#4F46E5] to-[#7C3AED]">Dashboard</span><br />
                                     Endless Opportunities.
                                 </motion.h1>
 
@@ -507,7 +507,7 @@ function UserHome() {
                     {/* Left column illustration */}
                     <div className="lg:col-span-5 flex justify-center">
                         <div className="relative w-full max-w-[400px]">
-                            <div className="absolute inset-0 bg-gradient-to-tr from-[#5B3DF5]/10 to-[#8F75FF]/10 rounded-3xl blur-2xl transform -rotate-6"></div>
+                            <div className="absolute inset-0 bg-linear-to-tr from-[#5B3DF5]/10 to-[#8F75FF]/10 rounded-3xl blur-2xl transform -rotate-6"></div>
                             <img 
                                 src="/aboutus.jpeg" 
                                 alt="Modern Developers Working Together" 

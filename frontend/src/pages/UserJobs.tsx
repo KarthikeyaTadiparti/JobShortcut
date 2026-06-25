@@ -99,7 +99,7 @@ function UserJobs() {
         <div className="text-[#111827] min-h-screen flex flex-col font-sans bg-[#FCFAFF]">
             <UserNavbar />
 
-            <main className="flex-grow">
+            <main className="grow">
                 {/* Main Content Search/Filter & Streams Area */}
                 <section id="jobs-section" className="max-w-[1280px] mx-auto px-6 md:px-10 py-10">
                     <div className="flex flex-col space-y-12">
