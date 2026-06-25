@@ -115,7 +115,7 @@ function UserJobs() {
 
                             <form onSubmit={handleSearchSubmit} className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
                                 {/* Keywords input */}
-                                <div className="md:col-span-5 flex items-center gap-3 border border-[#E5E7EB] rounded-2xl px-4 py-2.5 bg-[#FCFAFF] focus-within:border-[#7B61FF] focus-within:bg-white transition-all">
+                                <div className="md:col-span-6 flex items-center gap-3 border border-[#E5E7EB] rounded-2xl px-4 py-2.5 bg-[#FCFAFF] focus-within:border-[#7B61FF] focus-within:bg-white transition-all">
                                     <Search className="h-4.5 w-4.5 text-[#5B6475]" />
                                     <input
                                         type="text"
@@ -139,14 +139,14 @@ function UserJobs() {
                                 </div>
 
                                 {/* Search button */}
-                                <div className="md:col-span-3">
+                                <div className="md:col-span-2">
                                     <motion.button
                                         type="submit"
                                         whileHover={{ y: -2 }}
                                         whileTap={{ scale: 0.98 }}
                                         className="w-full bg-[#5B3DF5] text-white font-bold text-sm py-3 rounded-2xl shadow-md hover:bg-[#4a2ee0] transition-colors cursor-pointer"
                                     >
-                                        Search Stream
+                                        Search
                                     </motion.button>
                                 </div>
                             </form>

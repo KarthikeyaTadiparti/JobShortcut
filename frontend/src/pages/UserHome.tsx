@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import {
     Sparkles,
     ArrowRight,
@@ -21,7 +21,6 @@ import {
     CheckCircle,
     Award
 } from 'lucide-react'
-import { toast } from 'sonner'
 import UserNavbar from '@/components/UserNavbar'
 import UserFooter from '@/components/UserFooter'
 
@@ -50,6 +49,7 @@ const fadeUpVariants = {
 
 function UserHome() {
     const navigate = useNavigate()
+    const location = useLocation()
     const [isMobile, setIsMobile] = useState(false)
 
     useEffect(() => {
@@ -60,6 +60,19 @@ function UserHome() {
         window.addEventListener('resize', handleResize)
         return () => window.removeEventListener('resize', handleResize)
     }, [])
+
+    useEffect(() => {
+        if (location.hash) {
+            const id = location.hash.substring(1)
+            const el = document.getElementById(id)
+            if (el) {
+                const timer = setTimeout(() => {
+                    el.scrollIntoView({ behavior: 'smooth' })
+                }, 150)
+                return () => clearTimeout(timer)
+            }
+        }
+    }, [location.key, location.hash])
 
     return (
         <div className="text-[#111827] min-h-screen flex flex-col font-sans bg-[#FCFAFF]">
@@ -496,7 +509,7 @@ function UserHome() {
                         <div className="relative w-full max-w-[400px]">
                             <div className="absolute inset-0 bg-gradient-to-tr from-[#5B3DF5]/10 to-[#8F75FF]/10 rounded-3xl blur-2xl transform -rotate-6"></div>
                             <img 
-                                src="/developers_illustration.png" 
+                                src="/aboutus.jpeg" 
                                 alt="Modern Developers Working Together" 
                                 className="relative w-full h-auto object-contain rounded-3xl shadow-lg border border-[#EBE3FF]"
                             />

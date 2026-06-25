@@ -14,6 +14,7 @@ import {
 
 function UserNavbar() {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+    const [activeSection, setActiveSection] = useState<string>('')
     const location = useLocation()
     const navigate = useNavigate()
 
@@ -28,37 +29,138 @@ function UserNavbar() {
         }
     }, [mobileMenuOpen])
 
+    useEffect(() => {
+        if (location.pathname !== '/') {
+            setActiveSection('')
+            return
+        }
+
+        const sections = ['works', 'about']
+        const observers = sections.map(id => {
+            const el = document.getElementById(id)
+            if (!el) return null
+
+            const observer = new IntersectionObserver(
+                ([entry]) => {
+                    if (entry.isIntersecting) {
+                        setActiveSection(id)
+                    }
+                },
+                {
+                    threshold: 0.2,
+                    rootMargin: '-20% 0px -60% 0px'
+                }
+            )
+            observer.observe(el)
+            return { el, observer }
+        })
+
+        const heroEl = document.getElementById('hero-section')
+        let heroObserver: IntersectionObserver | null = null
+        if (heroEl) {
+            heroObserver = new IntersectionObserver(
+                ([entry]) => {
+                    if (entry.isIntersecting) {
+                        setActiveSection('')
+                    }
+                },
+                { threshold: 0.1, rootMargin: '0px' }
+            )
+            heroObserver.observe(heroEl)
+        }
+
+        const handleScroll = () => {
+            if (window.scrollY < 80) {
+                setActiveSection('')
+            }
+        }
+        window.addEventListener('scroll', handleScroll)
+
+        return () => {
+            observers.forEach(obs => {
+                if (obs) obs.observer.unobserve(obs.el)
+            })
+            if (heroObserver && heroEl) {
+                heroObserver.unobserve(heroEl)
+            }
+            window.removeEventListener('scroll', handleScroll)
+        }
+    }, [location.pathname])
+
     const isActive = (path: string) => location.pathname === path
 
     const getDesktopClass = (path: string) => {
+        if (path === '/') {
+            return (isActive('/') && activeSection === '')
+                ? "text-[#5B3DF5] font-bold"
+                : "text-[#5B6475] hover:text-[#5B3DF5] transition-colors"
+        }
         return isActive(path)
             ? "text-[#5B3DF5] font-bold"
-            : "hover:text-[#5B3DF5] transition-colors"
+            : "text-[#5B6475] hover:text-[#5B3DF5] transition-colors"
+    }
+
+    const getSectionDesktopClass = (sectionId: string) => {
+        return (isActive('/') && activeSection === sectionId)
+            ? "text-[#5B3DF5] font-bold cursor-pointer"
+            : "text-[#5B6475] hover:text-[#5B3DF5] transition-colors cursor-pointer"
     }
 
     const getMobileClass = (path: string) => {
+        const active = path === '/' ? (isActive('/') && activeSection === '') : isActive(path)
         return `flex items-center gap-4 w-full p-3 rounded-2xl transition-all ${
-            isActive(path)
-                ? 'bg-[#5B3DF5]/5 text-[#111827]'
+            active
+                ? 'bg-[#5B3DF5]/5 text-[#5B3DF5]'
                 : 'text-[#111827] hover:bg-[#5B3DF5]/5 active:bg-[#5B3DF5]/10'
         }`
+    }
+
+    const getSectionMobileClass = (sectionId: string) => {
+        const active = isActive('/') && activeSection === sectionId
+        return `flex items-center gap-4 w-full p-3 rounded-2xl transition-all ${
+            active
+                ? 'bg-[#5B3DF5]/5 text-[#5B3DF5]'
+                : 'text-[#111827] hover:bg-[#5B3DF5]/5 active:bg-[#5B3DF5]/10'
+        }`
+    }
+
+    const handleNavClick = (e: React.MouseEvent<HTMLAnchorElement>, sectionId: string) => {
+        if (location.pathname === '/') {
+            e.preventDefault()
+            const el = document.getElementById(sectionId)
+            if (el) {
+                el.scrollIntoView({ behavior: 'smooth' })
+            }
+        } else {
+            e.preventDefault()
+            navigate(`/#${sectionId}`)
+        }
+        setMobileMenuOpen(false)
+    }
+
+    const handleHomeClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+        if (location.pathname === '/') {
+            e.preventDefault()
+            window.scrollTo({ top: 0, behavior: 'smooth' })
+        }
+        setMobileMenuOpen(false)
     }
 
     return (
         <header className="sticky top-0 w-full z-50 bg-transparent border-transparent backdrop-blur-md">
             <div className="w-full h-16 flex items-center justify-between px-6 md:px-10 max-w-[1280px] mx-auto relative">
                 {/* Brand */}
-                <Link to="/" className="flex items-center gap-3 text-xl font-black text-[#111827]">
+                <Link to="/" onClick={handleHomeClick} className="flex items-center gap-3 text-xl font-black text-[#111827]">
                     <img src="/jobshortcut_logo.svg" alt="Job Shortcut Logo" className="h-8 w-auto object-contain" />
                     <span>Job <span className="text-[#5B3DF5]">Shortcut</span></span>
                 </Link>
 
                 {/* Center Links (Linear style) */}
                 <nav className="hidden lg:flex items-center gap-8 text-[14px] font-medium text-[#5B6475]">
-                    <Link to="/" className={getDesktopClass('/')}>Home</Link>
+                    <Link to="/" onClick={handleHomeClick} className={getDesktopClass('/')}>Home</Link>
                     <Link to="/jobs" className={getDesktopClass('/jobs')}>Job Opportunities</Link>
-                    <a href="#works" className="hover:text-[#5B3DF5] transition-colors">How it works</a>
-                    <a href="#about" className="hover:text-[#5B3DF5] transition-colors">About us</a>
+                    <a href="#works" onClick={(e) => handleNavClick(e, 'works')} className={getSectionDesktopClass('works')}>How it works</a>
+                    <a href="#about" onClick={(e) => handleNavClick(e, 'about')} className={getSectionDesktopClass('about')}>About us</a>
                 </nav>
 
                 {/* Mobile Hamburger Button */}
@@ -85,7 +187,7 @@ function UserNavbar() {
                         <div className="w-full flex items-center justify-between h-16">
                             <Link 
                                 to="/" 
-                                onClick={() => setMobileMenuOpen(false)} 
+                                onClick={handleHomeClick} 
                                 className="flex items-center gap-3 text-xl font-black text-[#111827]"
                             >
                                 <img src="/jobshortcut_logo.svg" alt="Job Shortcut Logo" className="h-8 w-auto object-contain" />
@@ -105,7 +207,7 @@ function UserNavbar() {
                             {/* Option 1: Home */}
                             <Link 
                                 to="/" 
-                                onClick={() => setMobileMenuOpen(false)}
+                                onClick={handleHomeClick}
                                 className={getMobileClass('/')}
                             >
                                 <div className="p-2.5 rounded-xl bg-[#5B3DF5]/10 text-[#5B3DF5]">
@@ -132,9 +234,9 @@ function UserNavbar() {
 
                             {/* Option 3: How it works */}
                             <a 
-                                href="#" 
-                                onClick={() => setMobileMenuOpen(false)}
-                                className="flex items-center gap-4 w-full p-3 rounded-2xl text-[#111827] transition-all hover:bg-[#5B3DF5]/5 active:bg-[#5B3DF5]/10"
+                                href="#works" 
+                                onClick={(e) => handleNavClick(e, 'works')}
+                                className={getSectionMobileClass('works')}
                             >
                                 <div className="p-2.5 rounded-xl bg-[#5B3DF5]/10 text-[#5B3DF5]">
                                     <Settings className="h-5 w-5" />
@@ -146,9 +248,9 @@ function UserNavbar() {
 
                             {/* Option 4: About us */}
                             <a 
-                                href="#" 
-                                onClick={() => setMobileMenuOpen(false)}
-                                className="flex items-center gap-4 w-full p-3 rounded-2xl text-[#111827] transition-all hover:bg-[#5B3DF5]/5 active:bg-[#5B3DF5]/10"
+                                href="#about" 
+                                onClick={(e) => handleNavClick(e, 'about')}
+                                className={getSectionMobileClass('about')}
                             >
                                 <div className="p-2.5 rounded-xl bg-[#5B3DF5]/10 text-[#5B3DF5]">
                                     <Users className="h-5 w-5" />
