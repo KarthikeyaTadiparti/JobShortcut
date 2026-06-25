@@ -1,5 +1,5 @@
 import { Button } from './ui/button'
-import { Terminal, Sun, Moon, LogOut } from 'lucide-react'
+import { Sun, Moon, LogOut } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { useDispatch, useSelector } from 'react-redux'
 import { clearUser } from '@/redux/reducers/auth-reducer'
