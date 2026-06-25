@@ -31,9 +31,7 @@ function AdminNavbar() {
             <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
                 <div className="flex h-16 items-center justify-between">
                         <div className="flex items-center gap-3">
-                            <div className="rounded-lg bg-indigo-600/10 p-2 text-indigo-400 border border-indigo-500/20">
-                                <Terminal className="h-6 w-6" />
-                            </div>
+                            <img src="/jobshortcut_logo.svg" alt="Job Shortcut Logo" className="h-8 w-auto object-contain" />
                             <span className="text-xl font-bold tracking-tight text-foreground">
                                 Job Shortcut
                             </span>
