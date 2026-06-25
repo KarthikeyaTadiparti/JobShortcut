@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button'
 import { useSelector } from 'react-redux'
 import { type RootState } from '@/redux/reducers'
 import { createJob, startScraperStream } from '@/api'
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Navigate } from 'react-router-dom'
 import {
     Play,
@@ -14,10 +14,11 @@ import {
     ExternalLink,
     Briefcase,
     MapPin,
-    Award,  
+    Award,
     Plus,
 } from 'lucide-react'
 import { toast } from 'sonner'
+import { Textarea } from "@/components/ui/textarea"
 import AdminNavbar from '@/components/AdminNavbar'
 import WarningDialog from '@/components/WarningDialog'
 import CreateJobDialog from '@/components/CreateJobDialog'
@@ -101,6 +102,8 @@ function Scraper() {
         return <Navigate to="/login" replace />
     }
 
+    const queryClient = useQueryClient()
+
     const handleUpdateField = (url: string, field: keyof ScrapedJob, newValue: string) => {
         setResults((prev) => {
             const currentJob = prev[url];
@@ -166,6 +169,7 @@ function Scraper() {
             setApprovedUrls((prev) => [...prev, variables.url]);
             setRejectedUrls((prev) => prev.filter((u) => u !== variables.url));
             toast.success("Job added successfully!");
+            queryClient.invalidateQueries({ queryKey: ['jobs'] });
         },
         onError: (err: any, variables) => {
             if (err && err.status === 409) {
@@ -226,6 +230,8 @@ function Scraper() {
             setScrapedCount(0)
             setResults({})
             setLogs([])
+            setApprovedUrls([])
+            setRejectedUrls([])
 
             await startScraperStream(urls, {
                 onStatus: (url, message) => {
@@ -331,7 +337,7 @@ function Scraper() {
                                     <label htmlFor="urls" className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
                                         Job URLs
                                     </label>
-                                    <textarea
+                                    <Textarea
                                         id="urls"
                                         rows={6}
                                         value={urlInput}
@@ -341,14 +347,14 @@ function Scraper() {
                                         className="w-full rounded-xl border border-border bg-background p-4 text-sm text-foreground placeholder-muted-foreground focus:border-indigo-500 focus:outline-none transition-colors resize-y font-mono"
                                     />
                                 </div>
- 
+
                                 {error && (
                                     <div className="rounded-lg border border-red-500/10 bg-red-500/5 p-4 text-xs text-red-400 flex items-start gap-2 animate-in fade-in duration-200">
                                         <XCircle className="h-4 w-4 shrink-0 mt-0.5" />
                                         <span>{error}</span>
                                     </div>
                                 )}
- 
+
                                 <Button
                                     onClick={handleStartScrape}
                                     disabled={scrapeMutation.isPending || !urlInput.trim()}
@@ -377,6 +383,9 @@ function Scraper() {
                                         'placement-officer.com',
                                         'freshersrecruitment.co.in',
                                         'freshersvoice.com',
+                                        'fvoice.site',
+                                        'fresheropenings.com',
+                                        'fresherscareers.co.in',
                                         'freshershunt.in',
                                         'dailypharmajobs.in'
                                     ].map((domain) => (
@@ -407,7 +416,7 @@ function Scraper() {
                             {/* Progress Bar */}
                             <div className="w-full bg-muted rounded-full h-2.5 overflow-hidden border border-border">
                                 <div
-                                    className="bg-gradient-to-r from-indigo-500 to-violet-500 h-full rounded-full transition-all duration-500 ease-out"
+                                    className="bg-linear-to-r from-indigo-500 to-violet-500 h-full rounded-full transition-all duration-500 ease-out"
                                     style={{ width: `${progressPercentage}%` }}
                                 />
                             </div>
@@ -504,20 +513,20 @@ function Scraper() {
                                     <div
                                         key={url}
                                         className={`rounded-xl border p-6 shadow-md hover:shadow-lg transition-all flex flex-col justify-between space-y-4 h-full ${isApproved
-                                                ? "border-emerald-500/30 bg-emerald-500/5 dark:bg-emerald-950/20"
-                                                : isRejected
-                                                    ? "border-red-500/20 bg-red-500/5 dark:bg-red-950/20 opacity-60"
-                                                    : "border-border bg-card/40 dark:bg-card/80 hover:border-border/80 dark:hover:border-indigo-500/30"
+                                            ? "border-emerald-500/30 bg-emerald-500/5 dark:bg-emerald-950/20"
+                                            : isRejected
+                                                ? "border-red-500/20 bg-red-500/5 dark:bg-red-950/20 opacity-60"
+                                                : "border-border bg-card/40 dark:bg-card/80 hover:border-border/80 dark:hover:border-indigo-500/30"
                                             }`}
                                     >
                                         <div className="space-y-4">
                                             {/* Card Top Header */}
                                             <div className="flex items-center justify-between gap-4">
                                                 <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${isApproved
-                                                        ? "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400"
-                                                        : isRejected
-                                                            ? "bg-red-500/20 text-red-600 dark:text-red-400"
-                                                            : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                                                    ? "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400"
+                                                    : isRejected
+                                                        ? "bg-red-500/20 text-red-600 dark:text-red-400"
+                                                        : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
                                                     }`}>
                                                     {isApproved ? 'Approved' : isRejected ? 'Rejected' : 'Scraped'}
                                                 </span>
@@ -555,29 +564,29 @@ function Scraper() {
 
                                             {/* Details Grid */}
                                             <div className="grid grid-cols-1 gap-2.5 text-xs">
-                                                 <div className="flex items-center gap-2.5 text-foreground/80 min-w-0">
-                                                     <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
-                                                     <span className="flex-1">
-                                                         <InlineEdit
-                                                             value={jobData.location || ''}
-                                                             placeholder="Location"
-                                                             onSave={(val) => handleUpdateField(url, 'location', val)}
-                                                             className="block w-full"
-                                                         />
-                                                     </span>
-                                                 </div>
-                                                 <div className="flex items-center gap-2.5 text-foreground/80 min-w-0">
-                                                     <Award className="h-4 w-4 text-muted-foreground shrink-0" />
-                                                     <span className="flex-1">
-                                                         <InlineEdit
-                                                             value={jobData.experience || ''}
-                                                             placeholder="Experience"
-                                                             onSave={(val) => handleUpdateField(url, 'experience', val)}
-                                                             className="block w-full"
-                                                         />
-                                                     </span>
-                                                 </div>
-                                             </div>
+                                                <div className="flex items-center gap-2.5 text-foreground/80 min-w-0">
+                                                    <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
+                                                    <span className="flex-1">
+                                                        <InlineEdit
+                                                            value={jobData.location || ''}
+                                                            placeholder="Location"
+                                                            onSave={(val) => handleUpdateField(url, 'location', val)}
+                                                            className="block w-full"
+                                                        />
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center gap-2.5 text-foreground/80 min-w-0">
+                                                    <Award className="h-4 w-4 text-muted-foreground shrink-0" />
+                                                    <span className="flex-1">
+                                                        <InlineEdit
+                                                            value={jobData.experience || ''}
+                                                            placeholder="Experience"
+                                                            onSave={(val) => handleUpdateField(url, 'experience', val)}
+                                                            className="block w-full"
+                                                        />
+                                                    </span>
+                                                </div>
+                                            </div>
                                         </div>
 
                                         {/* Apply Links Section */}
@@ -601,8 +610,8 @@ function Scraper() {
                                                             key={idx}
                                                             onClick={() => setSelectedLinks((prev) => ({ ...prev, [url]: link }))}
                                                             className={`flex items-center gap-2.5 rounded-md px-2.5 py-2 text-[11px] font-medium max-w-full cursor-pointer transition-colors ${isSelected
-                                                                    ? "bg-indigo-600/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20"
-                                                                    : "hover:bg-secondary text-muted-foreground hover:text-foreground border border-transparent"
+                                                                ? "bg-indigo-600/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20"
+                                                                : "hover:bg-secondary text-muted-foreground hover:text-foreground border border-transparent"
                                                                 }`}
                                                         >
                                                             <div className="flex items-center justify-center shrink-0">
@@ -658,8 +667,8 @@ function Scraper() {
                                                 variant={isApproved ? "default" : "outline"}
                                                 disabled={isCardPending}
                                                 className={`flex-1 gap-1.5 text-xs py-1.5 h-8 cursor-pointer transition-all ${isApproved
-                                                        ? "bg-emerald-600 hover:bg-emerald-500 text-white border-transparent"
-                                                        : "border-border text-foreground hover:bg-emerald-500/10 hover:text-emerald-600 hover:border-emerald-500/30"
+                                                    ? "bg-emerald-600 hover:bg-emerald-500 text-white border-transparent"
+                                                    : "border-border text-foreground hover:bg-emerald-500/10 hover:text-emerald-600 hover:border-emerald-500/30"
                                                     }`}
                                             >
                                                 {isApprovePending ? (
@@ -674,8 +683,8 @@ function Scraper() {
                                                 variant={isRejected ? "default" : "outline"}
                                                 disabled={isCardPending}
                                                 className={`flex-1 gap-1.5 text-xs py-1.5 h-8 cursor-pointer transition-all ${isRejected
-                                                        ? "bg-red-600 hover:bg-red-500 text-white border-transparent"
-                                                        : "border-border text-foreground hover:bg-red-500/10 hover:text-red-600 hover:border-red-500/30"
+                                                    ? "bg-red-600 hover:bg-red-500 text-white border-transparent"
+                                                    : "border-border text-foreground hover:bg-red-500/10 hover:text-red-600 hover:border-red-500/30"
                                                     }`}
                                             >
                                                 {isRejectPending ? (

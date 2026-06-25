@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { createJob } from '@/api';
 import { Button } from './ui/button';
 import { X, Loader2 } from 'lucide-react';
@@ -28,10 +28,12 @@ export default function CreateJobDialog({ isOpen, onClose }: CreateJobDialogProp
         };
     }, [isOpen]);
 
+    const queryClient = useQueryClient();
     const createMutation = useMutation({
         mutationFn: createJob,
         onSuccess: () => {
             toast.success("Job created successfully!");
+            queryClient.invalidateQueries({ queryKey: ['jobs'] });
             // Reset form
             setCompany('');
             setJobRole('');
