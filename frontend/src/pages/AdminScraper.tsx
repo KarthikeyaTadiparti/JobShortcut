@@ -16,6 +16,8 @@ import {
     MapPin,
     Award,
     Plus,
+    Check,
+    X,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Textarea } from "@/components/ui/textarea"
@@ -132,6 +134,43 @@ function Scraper() {
                 }
             };
         });
+    };
+
+    // Add Custom Link States and Handlers
+    const [addingLinkForUrl, setAddingLinkForUrl] = useState<string | null>(null)
+    const [newCustomLink, setNewCustomLink] = useState('')
+
+    const handleAddApplyLink = (url: string, newLink: string) => {
+        setResults((prev) => {
+            const currentJob = prev[url];
+            if (!currentJob) return prev;
+            const updatedLinks = [...currentJob.applyLinks, newLink.trim()];
+            return {
+                ...prev,
+                [url]: {
+                    ...currentJob,
+                    applyLinks: updatedLinks,
+                }
+            };
+        });
+        setSelectedLinks((prev) => ({ ...prev, [url]: newLink.trim() }));
+        toast.success("Custom apply link added!");
+    };
+
+    const handleSaveCustomLink = (url: string) => {
+        if (!newCustomLink.trim()) {
+            toast.error("Please enter a valid URL.");
+            return;
+        }
+
+        if (!newCustomLink.trim().startsWith("http://") && !newCustomLink.trim().startsWith("https://")) {
+            toast.error("URL must start with http:// or https://");
+            return;
+        }
+
+        handleAddApplyLink(url, newCustomLink.trim());
+        setAddingLinkForUrl(null);
+        setNewCustomLink('');
     };
 
     // Form and Scraper State
@@ -656,6 +695,53 @@ function Scraper() {
                                                     <span className="text-xs text-muted-foreground italic p-2 text-center block w-full">
                                                         No apply links extracted from details.
                                                     </span>
+                                                )}
+
+                                                {/* Add Custom Link Input/Button */}
+                                                {addingLinkForUrl === url ? (
+                                                    <div className="flex items-center gap-1.5 rounded-md px-2 py-1.5 border border-indigo-500/30 bg-indigo-500/5 mt-1">
+                                                        <input
+                                                            type="url"
+                                                            placeholder="Paste custom URL here..."
+                                                            value={newCustomLink}
+                                                            onChange={(e) => setNewCustomLink(e.target.value)}
+                                                            className="flex-1 bg-transparent border-none text-[11px] text-foreground focus:outline-none placeholder-muted-foreground/60 focus:ring-0"
+                                                            autoFocus
+                                                            onKeyDown={(e) => {
+                                                                if (e.key === 'Enter') {
+                                                                    handleSaveCustomLink(url);
+                                                                } else if (e.key === 'Escape') {
+                                                                    setAddingLinkForUrl(null);
+                                                                    setNewCustomLink('');
+                                                                }
+                                                            }}
+                                                        />
+                                                        <button
+                                                            onClick={() => handleSaveCustomLink(url)}
+                                                            className="text-emerald-500 hover:text-emerald-400 p-0.5 cursor-pointer"
+                                                        >
+                                                            <Check className="h-3.5 w-3.5" />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => {
+                                                                setAddingLinkForUrl(null);
+                                                                setNewCustomLink('');
+                                                            }}
+                                                            className="text-red-500 hover:text-red-400 p-0.5 cursor-pointer"
+                                                        >
+                                                            <X className="h-3.5 w-3.5" />
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    <button
+                                                        onClick={() => {
+                                                            setAddingLinkForUrl(url);
+                                                            setNewCustomLink('');
+                                                        }}
+                                                        className="bg-secondary flex items-center justify-center gap-1 rounded-md border border-dashed border-border py-2 text-[10px] font-semibold text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-all cursor-pointer mt-1"
+                                                    >
+                                                        <Plus className="h-3 w-3" /> Add Custom Link
+                                                    </button>
                                                 )}
                                             </div>
                                         </div>
