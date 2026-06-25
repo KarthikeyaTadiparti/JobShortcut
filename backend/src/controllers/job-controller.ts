@@ -2,6 +2,7 @@ import type { Request, Response } from "express";
 import wrapAsync from "../utils/wrap-async.js";
 import { createJob, checkApplyLinkExists, getJobsList } from "../services/job-services.js";
 import ExpressError from "../middlewares/errorhandler.js";
+import { normalizeJobUrl } from "../utils/normalize-url.js";
 
 export const createJobHandler = wrapAsync(async (req: Request, res: Response) => {
     const { company, jobRole, experience, location, applyLink, applyLinks } = req.body;
@@ -20,10 +21,7 @@ export const createJobHandler = wrapAsync(async (req: Request, res: Response) =>
         throw new ExpressError(401, "Admin must be logged in to approve jobs");
     }
 
-    let formattedApplyLink = applyLink.trim();
-    if (!formattedApplyLink.endsWith("/")) {
-        formattedApplyLink += "/";
-    }
+    const formattedApplyLink = normalizeJobUrl(applyLink);
 
     // Check if the apply link already exists in the database
     const exists = await checkApplyLinkExists(formattedApplyLink);

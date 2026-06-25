@@ -2,6 +2,7 @@ import db from "../config/db.js";
 import { jobs } from "../schema/jobs-schema.js";
 import type { Job, NewJob } from "../schema/jobs-schema.js";
 import { eq, ilike, or, and, not, desc, isNull } from "drizzle-orm";
+import { normalizeJobUrl } from "../utils/normalize-url.js";
 
 
 /**
@@ -14,10 +15,11 @@ export async function checkApplyLinkExists(applyLink: string): Promise<boolean> 
     }
 
     try {
+        const normalized = normalizeJobUrl(applyLink);
         const existing = await db
             .select({ id: jobs.id })
             .from(jobs)
-            .where(eq(jobs.applyLink, applyLink));
+            .where(eq(jobs.applyLink, normalized));
         
         return existing.length > 0;
     } catch (error) {
@@ -30,7 +32,11 @@ export async function checkApplyLinkExists(applyLink: string): Promise<boolean> 
  * Inserts a new job record into the jobs table.
  */
 export async function createJob(data: NewJob): Promise<Job> {
-    const [newJob] = await db.insert(jobs).values(data).returning();
+    const normalizedData = {
+        ...data,
+        applyLink: normalizeJobUrl(data.applyLink),
+    };
+    const [newJob] = await db.insert(jobs).values(normalizedData).returning();
     if (!newJob) {
         throw new Error("Failed to create job");
     }
