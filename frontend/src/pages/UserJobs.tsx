@@ -84,7 +84,7 @@ function UserJobs() {
 
     // Pagination logic
     const [currentPage, setCurrentPage] = useState(1)
-    const jobsPerPage = 6
+    const jobsPerPage = 9
 
     useEffect(() => {
         setCurrentPage(1)
