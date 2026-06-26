@@ -9,7 +9,8 @@ import {
     Clock,
     Building,
     ChevronLeft,
-    ChevronRight
+    ChevronRight,
+    AlertCircle
 } from 'lucide-react'
 import { getJobs } from '@/api'
 import UserNavbar from '@/components/UserNavbar'
@@ -189,20 +190,56 @@ function UserJobs() {
 
                         {/* Loading state Skeletons */}
                         {isLoading && (
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-[1280px] w-full mx-auto">
-                                {[...Array(6)].map((_, idx) => (
-                                    <div key={idx} className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm animate-pulse space-y-5">
-                                        <div className="space-y-3">
-                                            <div className="h-3 w-1/3 bg-gray-100 rounded" />
-                                            <div className="h-3.5 w-1/2 bg-gray-100 rounded" />
-                                        </div>
-                                        <div className="space-y-2.5 pt-4">
-                                            <div className="h-3.5 w-2/3 bg-gray-100 rounded" />
-                                            <div className="h-3.5 w-3/5 bg-gray-100 rounded" />
-                                        </div>
-                                        <div className="h-10 w-full bg-gray-100 rounded-xl pt-4" />
+                            <div className="w-full max-w-[1280px] mx-auto space-y-6">
+                                {/* Render Cold Start Warning Box */}
+                                <div className="bg-[#FFFDF5] border border-[#F3E8B4] text-[#8C6D1F] p-5 rounded-2xl flex items-start gap-4 shadow-sm max-w-4xl mx-auto animate-pulse">
+                                    <AlertCircle className="h-6 w-6 text-[#D4AF37] shrink-0 mt-0.5" />
+                                    <div className="space-y-1">
+                                        <h4 className="text-sm font-bold text-[#755D18]">Connecting to Backend Server...</h4>
+                                        <p className="text-xs text-[#8C6D1F]/90 leading-relaxed font-medium">
+                                            Please note: Initial data fetch might take <strong>1-2 minutes</strong> due to a cold start on the Render free hosting tier. We appreciate your patience!
+                                        </p>
                                     </div>
-                                ))}
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                                    {[...Array(6)].map((_, idx) => (
+                                        <div key={idx} className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm animate-pulse space-y-6 flex flex-col justify-between min-h-[340px]">
+                                            <div className="space-y-4">
+                                                {/* Date Skeleton */}
+                                                <div className="flex justify-between items-center">
+                                                    <div className="h-3.5 w-24 bg-gray-200 rounded-full" />
+                                                </div>
+                                                
+                                                {/* Company Name Skeleton */}
+                                                <div className="h-3.5 w-32 bg-[#E1D8FF] rounded-full" />
+                                                
+                                                {/* Job Title Skeleton */}
+                                                <div className="space-y-2">
+                                                    <div className="h-5 w-11/12 bg-gray-200 rounded-lg" />
+                                                    <div className="h-5 w-2/3 bg-gray-200 rounded-lg" />
+                                                </div>
+                                            </div>
+
+                                            <div>
+                                                {/* Location / Experience Skeleton */}
+                                                <div className="space-y-3 mb-8 border-t border-gray-100 pt-4">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="h-4 w-4 bg-gray-200 rounded-full shrink-0" />
+                                                        <div className="h-3.5 w-2/3 bg-gray-200 rounded-full" />
+                                                    </div>
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="h-4 w-4 bg-gray-200 rounded-full shrink-0" />
+                                                        <div className="h-3.5 w-1/2 bg-gray-200 rounded-full" />
+                                                    </div>
+                                                </div>
+                                                
+                                                {/* Apply Button Skeleton */}
+                                                <div className="h-11 w-full bg-gray-200 rounded-xl" />
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
                         )}
 
