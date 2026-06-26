@@ -17,10 +17,19 @@ export async function extractJobLinks(url: string): Promise<ScrapedJob | null> {
 
   const page = await browser.newPage();
 
+  // Block all non-navigation requests (images, styles, ads, external scripts) to prevent timeouts in production
+  await page.route("**/*", (route) => {
+    if (route.request().isNavigationRequest()) {
+      route.continue();
+    } else {
+      route.abort();
+    }
+  });
+
   try {
     await page.goto(url, {
-      waitUntil: "networkidle",
-      timeout: 60000,
+      waitUntil: "domcontentloaded",
+      timeout: 30000,
     });
 
     const pageData = await page.evaluate(() => {
@@ -32,8 +41,8 @@ export async function extractJobLinks(url: string): Promise<ScrapedJob | null> {
           const cell0 = cells[0];
           const cell1 = cells[1];
           if (cell0 && cell1) {
-            const key = cell0.textContent?.trim().toLowerCase() || "";
-            const value = cell1.textContent?.trim() || "";
+            const key = cell0.textContent?.replace(/\s+/g, " ").trim().toLowerCase() || "";
+            const value = cell1.textContent?.replace(/\s+/g, " ").trim() || "";
             if (key) {
               data[key] = value;
             }

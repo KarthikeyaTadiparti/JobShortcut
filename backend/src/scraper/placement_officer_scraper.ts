@@ -17,6 +17,15 @@ export async function extractJobLinks(url: string): Promise<ScrapedJob | null> {
 
   const page = await browser.newPage();
 
+  // Block all non-navigation requests (images, styles, ads, external scripts) to prevent timeouts in production
+  await page.route("**/*", (route) => {
+    if (route.request().isNavigationRequest()) {
+      route.continue();
+    } else {
+      route.abort();
+    }
+  });
+
   try {
     await page.goto(url, {
       waitUntil: "domcontentloaded",
