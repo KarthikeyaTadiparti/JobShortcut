@@ -19,8 +19,8 @@ export async function extractJobLinks(url: string): Promise<ScrapedJob | null> {
 
   try {
     await page.goto(url, {
-      waitUntil: "networkidle",
-      timeout: 60000,
+      waitUntil: "domcontentloaded",
+      timeout: 30000,
     });
 
     const pageData = await page.evaluate(() => {
@@ -32,8 +32,8 @@ export async function extractJobLinks(url: string): Promise<ScrapedJob | null> {
           const cell0 = cells[0];
           const cell1 = cells[1];
           if (cell0 && cell1) {
-            const key = cell0.textContent?.trim().toLowerCase() || "";
-            const value = cell1.textContent?.trim() || "";
+            const key = cell0.textContent?.replace(/\s+/g, " ").trim().toLowerCase() || "";
+            const value = cell1.textContent?.replace(/\s+/g, " ").trim() || "";
             if (key) {
               data[key] = value;
             }
@@ -43,7 +43,10 @@ export async function extractJobLinks(url: string): Promise<ScrapedJob | null> {
 
       const anchors = Array.from(document.querySelectorAll("a[href]"));
       const applyLinks = anchors
-        .filter((a) => a.textContent?.trim().toLowerCase().includes("click here to apply"))
+        .filter((a) => {
+          const text = a.textContent?.replace(/\s+/g, " ").trim().toLowerCase() || "";
+          return text.includes("click here to apply");
+        })
         .map((a) => (a as HTMLAnchorElement).href);
 
       return {
