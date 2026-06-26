@@ -1,6 +1,6 @@
 # Use the official Microsoft Playwright image with Node.js
 # This container comes pre-configured with all necessary dependencies for running Chromium, Firefox, and WebKit headlessly.
-FROM mcr.microsoft.com/playwright:v1.47.0-jammy
+FROM mcr.microsoft.com/playwright:v1.61.0-jammy
 
 # Set the working directory
 WORKDIR /usr/src/app
