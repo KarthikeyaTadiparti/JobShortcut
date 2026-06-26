@@ -85,7 +85,7 @@ function UserHome() {
                 <div 
                     className="w-full relative bg-[#FCFAFF] -mt-16"
                     style={{
-                        backgroundImage: `linear-gradient(to bottom, rgba(252, 250, 255, 0) 70%, #FCFAFF 100%), url('${isMobile ? '/MobileBackdrop.png' : '/Backdrop.png'}')`,
+                        backgroundImage: `linear-gradient(to bottom, rgba(252, 250, 255, 0) 70%, #FCFAFF 100%), url('${isMobile ? '/MobileBackdrop.webp' : '/Backdrop.webp'}')`,
                         backgroundSize: isMobile ? '100% 100%, 100% 100%' : 'cover, cover',
                         backgroundPosition: isMobile ? 'top center, top center' : 'center, 80% center',
                         backgroundRepeat: 'no-repeat, no-repeat'
@@ -509,7 +509,7 @@ function UserHome() {
                         <div className="relative w-full max-w-[400px]">
                             <div className="absolute inset-0 bg-linear-to-tr from-[#5B3DF5]/10 to-[#8F75FF]/10 rounded-3xl blur-2xl transform -rotate-6"></div>
                             <img 
-                                src="/aboutus.jpeg" 
+                                src="/aboutus.webp" 
                                 alt="Modern Developers Working Together" 
                                 className="relative w-full h-auto object-contain rounded-3xl shadow-lg border border-[#EBE3FF]"
                             />
