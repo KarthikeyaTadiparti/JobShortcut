@@ -5,7 +5,6 @@ import AdminLogin from '@/pages/AdminLogin'
 import AdminScraper from './pages/AdminScraper'
 import UserJobs from './pages/UserJobs'
 import UserHome from './pages/UserHome'
-import { Analytics } from '@vercel/analytics/react'
 
 function Admin() {
 
@@ -33,7 +32,6 @@ function App() {
         {/* Catch-all route */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-      <Analytics />
     </>
   )
 }
