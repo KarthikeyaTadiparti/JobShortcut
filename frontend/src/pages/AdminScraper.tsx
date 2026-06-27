@@ -18,6 +18,7 @@ import {
     Plus,
     Check,
     X,
+    Copy,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Textarea } from "@/components/ui/textarea"
@@ -189,6 +190,9 @@ function Scraper() {
     // Track selected apply link for each scraped card (keyed by card url)
     const [selectedLinks, setSelectedLinks] = useState<Record<string, string>>({})
 
+    // Track copied WhatsApp message URL
+    const [copiedUrl, setCopiedUrl] = useState<string | null>(null)
+
     // Dialog modal state
     const [showDialog, setShowDialog] = useState(false)
     const [dialogMessage, setDialogMessage] = useState('')
@@ -258,6 +262,27 @@ function Scraper() {
     const handleReject = (url: string) => {
         rejectMutation.mutate(url);
     }
+
+    const handleCopyWhatsApp = (url: string, jobData: ScrapedJob) => {
+        const selectedLink = selectedLinks[url] || (jobData.applyLinks && jobData.applyLinks[0]) || "";
+        const message = `Job role: ${(jobData.jobRole || '').trim()}
+Company: ${(jobData.company || '').trim()}
+Location: ${(jobData.location || '').trim()}
+Experience: ${(jobData.experience || '').trim()}
+
+Apply Link:${selectedLink.trim()}`;
+
+        navigator.clipboard.writeText(message)
+            .then(() => {
+                toast.success("WhatsApp message copied!");
+                setCopiedUrl(url);
+                setTimeout(() => setCopiedUrl(null), 2000);
+            })
+            .catch((err) => {
+                console.error("Failed to copy text: ", err);
+                toast.error("Failed to copy message.");
+            });
+    };
 
     // UI refs
     const logEndRef = useRef<HTMLDivElement>(null)
@@ -569,14 +594,33 @@ function Scraper() {
                                                     }`}>
                                                     {isApproved ? 'Approved' : isRejected ? 'Rejected' : 'Scraped'}
                                                 </span>
-                                                <a
-                                                    href={url}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300 font-medium text-xs flex items-center gap-1.5 shrink-0"
-                                                >
-                                                    Source <ExternalLink className="h-3.5 w-3.5" />
-                                                </a>
+                                                <div className="flex items-center gap-3">
+                                                    <button
+                                                        onClick={() => handleCopyWhatsApp(url, jobData)}
+                                                        className="text-muted-foreground hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors text-xs flex items-center gap-1 cursor-pointer font-medium"
+                                                        title="Copy WhatsApp Message"
+                                                    >
+                                                        {copiedUrl === url ? (
+                                                            <>
+                                                                <Check className="h-3.5 w-3.5 text-emerald-500" />
+                                                                <span className="text-emerald-500">Copied!</span>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <Copy className="h-3.5 w-3.5" />
+                                                                <span>Copy</span>
+                                                            </>
+                                                        )}
+                                                    </button>
+                                                    <a
+                                                        href={url}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300 font-medium text-xs flex items-center gap-1.5 shrink-0"
+                                                    >
+                                                        Source <ExternalLink className="h-3.5 w-3.5" />
+                                                    </a>
+                                                </div>
                                             </div>
 
                                             {/* Job Title & Company (occupies full width) */}
