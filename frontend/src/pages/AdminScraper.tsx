@@ -284,6 +284,47 @@ Apply Link:${selectedLink.trim()}`;
             });
     };
 
+    const handleCopyAllApprovedWhatsApp = () => {
+        const approvedJobs = Object.entries(results)
+            .filter(([url, jobData]) => jobData !== null && approvedUrls.includes(url))
+            .map(([url, jobData]) => {
+                const data = jobData!;
+                const selectedLink = selectedLinks[url] || (data.applyLinks && data.applyLinks[0]) || "";
+                return {
+                    jobRole: (data.jobRole || '').trim(),
+                    company: (data.company || '').trim(),
+                    location: (data.location || '').trim(),
+                    experience: (data.experience || '').trim(),
+                    applyLink: selectedLink.trim()
+                };
+            });
+
+        if (approvedJobs.length === 0) {
+            toast.error("No approved jobs to copy.");
+            return;
+        }
+
+        const emojis = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"];
+        const message = approvedJobs.map((job, idx) => {
+            const numLabel = idx < 10 ? emojis[idx] : `*${idx + 1}.*`;
+            return `${numLabel} *${job.jobRole || 'Job Opportunity'}* at *${job.company || 'Unknown Company'}*
+📍 *Location:* ${job.location || 'Not Specified'}
+🎓 *Experience:* ${job.experience || 'Not Specified'}
+🔗 *Apply Link:* ${job.applyLink}`;
+        }).join('\n\n');
+
+        const finalMessage = `🔥 *LATEST JOB OPPORTUNITIES* 🔥\n\n${message}\n\nApply soon! 🚀`;
+
+        navigator.clipboard.writeText(finalMessage)
+            .then(() => {
+                toast.success("All approved jobs copied in WhatsApp format!");
+            })
+            .catch((err) => {
+                console.error("Failed to copy text: ", err);
+                toast.error("Failed to copy message.");
+            });
+    };
+
     // UI refs
     const logEndRef = useRef<HTMLDivElement>(null)
 
@@ -528,10 +569,21 @@ Apply Link:${selectedLink.trim()}`;
                 {/* Bottom Section: Scraped Results */}
                 <div className="mt-12 space-y-6">
                     <div className="flex items-center justify-between border-b border-border pb-4">
-                        <h2 className="text-xl font-bold text-foreground">Scraped Results</h2>
-                        <span className="rounded-full bg-secondary border border-border px-3 py-1 text-xs text-secondary-foreground font-semibold">
-                            {Object.keys(results).length} URLs
-                        </span>
+                        <div className="flex items-center gap-3">
+                            <h2 className="text-xl font-bold text-foreground">Scraped Results</h2>
+                            <span className="rounded-full bg-secondary border border-border px-3 py-1 text-xs text-secondary-foreground font-semibold">
+                                {Object.keys(results).length} URLs
+                            </span>
+                        </div>
+                        {approvedUrls.length > 0 && (
+                            <Button
+                                onClick={handleCopyAllApprovedWhatsApp}
+                                className="cursor-pointer bg-emerald-600 hover:bg-emerald-500 text-white font-medium gap-2 px-4 py-2 rounded-lg transition-all text-xs"
+                            >
+                                <Copy className="h-4 w-4" />
+                                Copy Approved ({approvedUrls.length})
+                            </Button>
+                        )}
                     </div>
 
                     {/* Job Details Cards Grid */}
