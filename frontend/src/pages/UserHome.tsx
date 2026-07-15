@@ -6,8 +6,6 @@ import {
     ArrowRight,
     Play,
     Search,
-    Filter,
-    Bolt,
     Globe,
     ShieldCheck,
     Folder,
