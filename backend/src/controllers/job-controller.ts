@@ -4,6 +4,8 @@ import { createJob, checkApplyLinkExists, getJobsList } from "../services/job-se
 import ExpressError from "../middlewares/errorhandler.js";
 import { normalizeJobUrl } from "../utils/normalize-url.js";
 
+const JOBS_PER_PAGE = 12;
+
 export const createJobHandler = wrapAsync(async (req: Request, res: Response) => {
     const { company, jobRole, experience, location, applyLink, applyLinks } = req.body;
 
@@ -45,18 +47,42 @@ export const createJobHandler = wrapAsync(async (req: Request, res: Response) =>
     });
 });
 
-export const getJobsHandler = wrapAsync(async (req: Request, res: Response) => {
-    const { search, location, filterType } = req.query;
+// export const getJobsHandler = wrapAsync(async (req: Request, res: Response) => {
+//     const { search, location, filterType } = req.query;
 
-    const data = await getJobsList({
-        search: typeof search === "string" ? search : undefined,
-        location: typeof location === "string" ? location : undefined,
-        filterType: typeof filterType === "string" ? filterType : undefined,
-    });
+//     const data = await getJobsList({
+//         search: typeof search === "string" ? search : undefined,
+//         location: typeof location === "string" ? location : undefined,
+//         filterType: typeof filterType === "string" ? filterType : undefined,
+//     });
+
+//     return res.status(200).json({
+//         status: true,
+//         data,
+//     });
+// });
+
+export const getJobsHandler = wrapAsync(async (req: Request, res: Response) => {
+    const { page = "1", search, location, filterType } = req.query;
+
+    const { jobs, totalCount } = await getJobsList(
+        typeof page === "string" ? Number(page) : 1,
+        JOBS_PER_PAGE,
+        {
+            search: typeof search === "string" ? search : undefined,
+            location: typeof location === "string" ? location : undefined,
+            filterType: typeof filterType === "string" ? filterType : undefined,
+        });
 
     return res.status(200).json({
         status: true,
-        data,
+        data: {
+            jobs,
+            currentPage: typeof page === "string" ? Number(page) : 1,
+            jobsPerPage: JOBS_PER_PAGE,
+            totalPages: Math.ceil(totalCount / JOBS_PER_PAGE),
+            totalCount,
+        }
     });
 });
 

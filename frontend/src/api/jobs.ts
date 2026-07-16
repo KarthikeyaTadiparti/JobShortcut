@@ -26,13 +26,16 @@ export async function createJob(data: CreateJobData) {
   });
 }
 
-export async function getJobs(params?: { search?: string; location?: string; filterType?: string }) {
+export async function getJobs(params?: { page: number; search?: string; location?: string; filterType?: string }) {
   const query = new URLSearchParams();
+  
+  if (params?.page) query.append('page', params.page.toString());
   if (params?.search) query.append('search', params.search);
   if (params?.location) query.append('location', params.location);
   if (params?.filterType) query.append('filterType', params.filterType);
 
   const queryString = query.toString();
-  return apiClient<{ status: boolean; data: Job[] }>(`/jobs${queryString ? `?${queryString}` : ''}`);
+  console.log(`/jobs${queryString ? `?${queryString}` : ''}`);
+  return apiClient<{ status: boolean; data: { jobs: Job[]; currentPage: number; jobsPerPage: number; totalPages: number; totalCount: number } }>(`/jobs${queryString ? `?${queryString}` : ''}`);
 }
 

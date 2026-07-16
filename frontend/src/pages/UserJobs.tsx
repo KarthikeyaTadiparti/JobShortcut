@@ -27,8 +27,6 @@ export interface Job {
     updatedAt: string;
 }
 
-// Default mock jobs to display if DB is empty
-
 function formatRelativeTime(dateString: string): string {
     const date = new Date(dateString)
     const now = new Date()
@@ -55,19 +53,24 @@ function UserJobs() {
     const [searchQuery, setSearchQuery] = useState('')
     const [locationQuery, setLocationQuery] = useState('')
 
+    // Pagination logic
+    const [currentPage, setCurrentPage] = useState(1)
+
     // Filter state
     const [filterType, setFilterType] = useState<string>('') // '', 'freshers', 'experienced', 'remote'
 
     // Fetch approved jobs
     const { data: dbJobs, isLoading } = useQuery({
-        queryKey: ['jobs', { search: searchQuery, location: locationQuery, filterType }],
+        queryKey: ['jobs', { page: currentPage, search: searchQuery, location: locationQuery, filterType }],
         queryFn: async () => {
             const response = await getJobs({
+                page: currentPage,
                 search: searchQuery || undefined,
                 location: locationQuery || undefined,
                 filterType: filterType || undefined
             })
-            return response.data || []
+
+            return response.data || undefined;
         }
     })
 
@@ -81,20 +84,18 @@ function UserJobs() {
     }
 
     // Select which list to display
-    const displayJobs = dbJobs || []
+    const displayJobs = dbJobs?.jobs || [];
+    const totalPages = dbJobs?.totalPages || 1;
+    const jobsPerPage = dbJobs?.jobsPerPage || 12;
+    const totalCount = dbJobs?.totalCount || 0;
 
-    // Pagination logic
-    const [currentPage, setCurrentPage] = useState(1)
-    const jobsPerPage = 12
 
     useEffect(() => {
         setCurrentPage(1)
     }, [searchQuery, locationQuery, filterType])
 
-    const totalPages = Math.ceil(displayJobs.length / jobsPerPage)
-    const indexOfLastJob = currentPage * jobsPerPage
-    const indexOfFirstJob = indexOfLastJob - jobsPerPage
-    const paginatedJobs = displayJobs.slice(indexOfFirstJob, indexOfLastJob)
+    
+    const paginatedJobs = displayJobs
 
     return (
         <div className="text-[#111827] min-h-screen flex flex-col font-sans bg-[#FCFAFF]">
@@ -184,7 +185,7 @@ function UserJobs() {
                                 Live feeds
                             </span>
                             <span className="text-xs bg-[#5B3DF5]/10 text-[#5B3DF5] px-3 py-1.5 rounded-full font-bold">
-                                {displayJobs.length} active opportunities
+                                {totalCount} active opportunities
                             </span>
                         </div>
 

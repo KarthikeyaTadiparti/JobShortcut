@@ -1,7 +1,7 @@
 import db from "../config/db.js";
 import { jobs } from "../schema/jobs-schema.js";
 import type { Job, NewJob } from "../schema/jobs-schema.js";
-import { eq, ilike, or, and, not, desc, isNull } from "drizzle-orm";
+import { eq, ilike, or, and, not, desc, isNull, count } from "drizzle-orm";
 import { normalizeJobUrl } from "../utils/normalize-url.js";
 
 
@@ -20,7 +20,7 @@ export async function checkApplyLinkExists(applyLink: string): Promise<boolean> 
             .select({ id: jobs.id })
             .from(jobs)
             .where(eq(jobs.applyLink, normalized));
-        
+
         return existing.length > 0;
     } catch (error) {
         console.error("Error checking apply link existence in db:", error);
@@ -48,8 +48,9 @@ export async function createJob(data: NewJob): Promise<Job> {
  * - search: search term in jobRole or company
  * - location: location search term
  * - filterType: "freshers", "experienced", or "remote"
+ * - jobsPerPage: number of jobs per page
  */
-export async function getJobsList(filters: { search?: string | undefined; location?: string | undefined; filterType?: string | undefined }): Promise<Job[]> {
+export async function getJobsList(page: number, jobsPerPage: number, filters: { search?: string | undefined; location?: string | undefined; filterType?: string | undefined }): Promise<{ jobs: Job[]; totalCount: number }> {
     const query = db.select().from(jobs);
     const conditions = [];
 
@@ -113,11 +114,52 @@ export async function getJobsList(filters: { search?: string | undefined; locati
         );
     }
 
+    // 1. Get total count
+    let totalCount = 0;
     if (conditions.length > 0) {
-        // @ts-ignore
-        return query.where(and(...conditions)).orderBy(desc(jobs.createdAt));
+        const [countResult] = await db.select({ value: count() }).from(jobs).where(and(...conditions));
+        totalCount = countResult ? Number(countResult.value) : 0;
+    } else {
+        const [countResult] = await db.select({ value: count() }).from(jobs);
+        totalCount = countResult ? Number(countResult.value) : 0;
     }
 
-    return query.orderBy(desc(jobs.createdAt));
+    // 2. Get paginated jobs via deferred join
+    let idsSubqueryBuilder = db
+        .select({ id: jobs.id })
+        .from(jobs);
+
+    if (conditions.length > 0) {
+        // @ts-ignore
+        idsSubqueryBuilder = idsSubqueryBuilder.where(and(...conditions));
+    }
+
+    const idsSubquery = idsSubqueryBuilder
+        .orderBy(desc(jobs.createdAt), desc(jobs.id))
+        .limit(jobsPerPage)
+        .offset((page - 1) * jobsPerPage)
+        .as("subquery");
+
+    // Perform the join to get full rows
+    const paginatedJobs = await db
+        .select({
+            id: jobs.id,
+            company: jobs.company,
+            jobRole: jobs.jobRole,
+            experience: jobs.experience,
+            location: jobs.location,
+            applyLink: jobs.applyLink,
+            addedBy: jobs.addedBy,
+            createdAt: jobs.createdAt,
+            updatedAt: jobs.updatedAt,
+        })
+        .from(jobs)
+        .innerJoin(idsSubquery, eq(jobs.id, idsSubquery.id))
+        .orderBy(desc(jobs.createdAt), desc(jobs.id));
+
+    return {
+        jobs: paginatedJobs,
+        totalCount
+    };
 }
 
