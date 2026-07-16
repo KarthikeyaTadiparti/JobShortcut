@@ -79,7 +79,6 @@ export const getJobsHandler = wrapAsync(async (req: Request, res: Response) => {
         data: {
             jobs,
             currentPage: typeof page === "string" ? Number(page) : 1,
-            jobsPerPage: JOBS_PER_PAGE,
             totalPages: Math.ceil(totalCount / JOBS_PER_PAGE),
             totalCount,
         }

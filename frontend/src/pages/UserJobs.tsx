@@ -86,7 +86,6 @@ function UserJobs() {
     // Select which list to display
     const displayJobs = dbJobs?.jobs || [];
     const totalPages = dbJobs?.totalPages || 1;
-    const jobsPerPage = dbJobs?.jobsPerPage || 12;
     const totalCount = dbJobs?.totalCount || 0;
 
 
