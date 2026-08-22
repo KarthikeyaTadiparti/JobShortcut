@@ -60,7 +60,12 @@ export async function extractJobLinks(url: string): Promise<ScrapedJob | null> {
         lines.forEach((line) => {
           if (line.includes(":")) {
             const parts = line.split(":");
-            const key = parts[0]
+            const firstPart = parts[0] ?? "";
+            if (!firstPart) {
+              return;
+            }
+
+            const key = firstPart
               .replace(/[\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD00-\uDFFF]/g, "") // remove emojis
               .replace(/\s+/g, " ")
               .trim()
