@@ -34,6 +34,8 @@ export async function extractJobLinks(url: string): Promise<ScrapedJob | null> {
 
     const pageData = await page.evaluate(() => {
       const data: Record<string, string> = {};
+
+      // 1. Table-based parsing
       const rows = document.querySelectorAll("table tr");
       rows.forEach((row) => {
         const cells = row.querySelectorAll("td, th");
@@ -50,11 +52,32 @@ export async function extractJobLinks(url: string): Promise<ScrapedJob | null> {
         }
       });
 
+      // 2. Text-based parsing (paragraphs, spans, list items)
+      const textElements = document.querySelectorAll("p, li, span, div");
+      textElements.forEach((el) => {
+        const text = el.textContent || "";
+        const lines = text.split("\n");
+        lines.forEach((line) => {
+          if (line.includes(":")) {
+            const parts = line.split(":");
+            const key = parts[0]
+              .replace(/[\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD00-\uDFFF]/g, "") // remove emojis
+              .replace(/\s+/g, " ")
+              .trim()
+              .toLowerCase();
+            const value = parts.slice(1).join(":").replace(/\s+/g, " ").trim();
+            if (key && value && !data[key]) {
+              data[key] = value;
+            }
+          }
+        });
+      });
+
       const anchors = Array.from(document.querySelectorAll("a[href]"));
       const applyLinks = anchors
         .filter((a) => {
           const text = a.textContent?.replace(/\s+/g, " ").trim().toLowerCase() || "";
-          return text.includes("click here to apply");
+          return text.includes("click here to apply") || text.includes("apply here") || text.includes("apply link");
         })
         .map((a) => (a as HTMLAnchorElement).href);
 
@@ -67,8 +90,8 @@ export async function extractJobLinks(url: string): Promise<ScrapedJob | null> {
     return {
       company: pageData.table["company"] || null,
       jobRole: pageData.table["role"] || pageData.table["job role"] || null,
-      experience: pageData.table["experience"] || null,
-      location: pageData.table["location"] || pageData.table["job location"] || null,
+      experience: pageData.table["experience required"] || pageData.table["experience"] || null,
+      location: pageData.table["job location"] || pageData.table["location"] || null,
       applyLinks: [...new Set(pageData.applyLinks)],
     };
   } catch (error) {
