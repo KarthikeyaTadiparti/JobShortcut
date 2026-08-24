@@ -43,7 +43,12 @@ export async function extractJobLinks(url: string): Promise<ScrapedJob | null> {
           const cell0 = cells[0];
           const cell1 = cells[1];
           if (cell0 && cell1) {
-            const key = cell0.textContent?.replace(/\s+/g, " ").trim().toLowerCase() || "";
+            const rawKey = cell0.textContent || "";
+            const key = rawKey
+              .replace(/[\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD00-\uDFFF]/g, "") // remove emojis
+              .replace(/\s+/g, " ")
+              .trim()
+              .toLowerCase();
             const value = cell1.textContent?.replace(/\s+/g, " ").trim() || "";
             if (key) {
               data[key] = value;
@@ -94,7 +99,7 @@ export async function extractJobLinks(url: string): Promise<ScrapedJob | null> {
 
     return {
       company: pageData.table["company"] || null,
-      jobRole: pageData.table["role"] || pageData.table["job role"] || null,
+      jobRole: pageData.table["role"] || pageData.table["job role"] || pageData.table["position"] || pageData.table["job title"] || null,
       experience: pageData.table["experience required"] || pageData.table["experience"] || null,
       location: pageData.table["job location"] || pageData.table["location"] || null,
       applyLinks: [...new Set(pageData.applyLinks)],
