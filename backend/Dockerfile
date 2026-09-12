@@ -24,5 +24,5 @@ EXPOSE 3000
 ENV NODE_ENV=production
 ENV PORT=3000
 
-# Run migrations and start the server
-CMD ["npm", "run", "start"]
+# Run the compiled server directly
+CMD ["node", "dist/server.js"]
