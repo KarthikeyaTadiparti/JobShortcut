@@ -49,6 +49,40 @@ function formatRelativeTime(dateString: string): string {
     }
 }
 
+function getPaginationRange(currentPage: number, totalPages: number): (number | string)[] {
+    if (totalPages <= 7) {
+        return Array.from({ length: totalPages }, (_, i) => i + 1);
+    }
+
+    const pageSet = new Set<number>();
+    pageSet.add(1);
+    pageSet.add(2);
+    pageSet.add(totalPages - 1);
+    pageSet.add(totalPages);
+
+    pageSet.add(Math.max(1, currentPage - 1));
+    pageSet.add(currentPage);
+    pageSet.add(Math.min(totalPages, currentPage + 1));
+
+    const sortedPages = Array.from(pageSet).sort((a, b) => a - b);
+    const pages: (number | string)[] = [];
+
+    for (let i = 0; i < sortedPages.length; i++) {
+        const curr = sortedPages[i]!;
+        if (i > 0) {
+            const prev = sortedPages[i - 1]!;
+            if (curr - prev === 2) {
+                pages.push(prev + 1);
+            } else if (curr - prev > 2) {
+                pages.push('...');
+            }
+        }
+        pages.push(curr);
+    }
+
+    return pages;
+}
+
 function UserJobs() {
     const { isAuthenticated } = useSelector((state: RootState) => state.auth)
     const queryClient = useQueryClient()
@@ -428,15 +462,26 @@ function UserJobs() {
                                     <ChevronLeft className="h-4.5 w-4.5" />
                                 </button>
 
-                                {[...Array(totalPages)].map((_, idx) => {
-                                    const pageNumber = idx + 1
-                                    const isActive = currentPage === pageNumber
+                                {getPaginationRange(currentPage, totalPages).map((item, idx) => {
+                                    if (typeof item === 'string') {
+                                        return (
+                                            <span
+                                                key={`ellipsis-${idx}`}
+                                                className="flex items-center justify-center w-10 h-10 text-[#5B6475] font-bold text-sm select-none"
+                                            >
+                                                ...
+                                            </span>
+                                        );
+                                    }
+
+                                    const pageNumber = item;
+                                    const isActive = currentPage === pageNumber;
                                     return (
                                         <button
                                             key={pageNumber}
                                             onClick={() => {
-                                                setCurrentPage(pageNumber)
-                                                document.getElementById('jobs-section')?.scrollIntoView({ behavior: 'smooth' })
+                                                setCurrentPage(pageNumber);
+                                                document.getElementById('jobs-section')?.scrollIntoView({ behavior: 'smooth' });
                                             }}
                                             className={`flex items-center justify-center w-10 h-10 rounded-xl border font-bold text-sm transition-all cursor-pointer active:scale-95 duration-200 ${
                                                 isActive
@@ -446,7 +491,7 @@ function UserJobs() {
                                         >
                                             {pageNumber}
                                         </button>
-                                    )
+                                    );
                                 })}
 
                                 <button
