@@ -305,7 +305,7 @@ function UserNavbar() {
                                 <>
                                     <div className="h-px w-[95%] bg-[#EBE3FF] opacity-50 mx-auto my-1"></div>
                                     <Link
-                                        to="/scrapers"
+                                        to="/admin/scraper"
                                         onClick={() => setMobileMenuOpen(false)}
                                         className="flex items-center gap-4 w-full p-3 rounded-2xl bg-[#5B3DF5]/5 text-[#5B3DF5]"
                                     >
