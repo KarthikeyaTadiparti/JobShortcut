@@ -67,17 +67,16 @@ export const handleAdminLogin = wrapAsync(async (req: Request, res: Response) =>
 
 // Logout
 export const handleAdminLogout = wrapAsync(async (req: Request, res: Response) => {
-    const cookies = req.cookies || {};
-    if (cookies.jwt) {
-        res.clearCookie("jwt", {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === "production",
-            sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
-        });
-        return res.status(200).json({ status: true, message: "Admin logged out successfully!" });
-    }
+    const isProduction = process.env.NODE_ENV === "production";
 
-    return res.status(200).json({ status: true, message: "No session found, but logged out anyway." });
+    res.clearCookie("jwt", {
+        httpOnly: true,
+        secure: isProduction,
+        sameSite: isProduction ? "none" : "lax",
+        path: "/",
+    });
+
+    return res.status(200).json({ status: true, message: "Admin logged out successfully!" });
 });
 
 
