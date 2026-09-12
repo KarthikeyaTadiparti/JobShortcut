@@ -21,7 +21,6 @@ RUN npm run build
 EXPOSE 3000
 
 # Set production environment variables
-ENV NODE_ENV=production
 ENV PORT=3000
 
 # Run the compiled server directly
