@@ -26,6 +26,13 @@ export async function createJob(data: CreateJobData) {
   });
 }
 
+export async function updateJob(id: number, data: Partial<CreateJobData>) {
+  return apiClient<{ status: boolean; data: Job; message: string }>(`/jobs/${id}`, {
+    method: 'PUT',
+    body: data,
+  });
+}
+
 export async function getJobs(params?: { page: number; search?: string; location?: string; filterType?: string }) {
   const query = new URLSearchParams();
   

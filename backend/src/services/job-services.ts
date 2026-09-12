@@ -44,6 +44,30 @@ export async function createJob(data: NewJob): Promise<Job> {
 }
 
 /**
+ * Updates an existing job record in the jobs table.
+ */
+export async function updateJob(id: number, data: Partial<NewJob>): Promise<Job | null> {
+    const updatePayload: Record<string, any> = {
+        updatedAt: new Date(),
+    };
+    if (data.company !== undefined) updatePayload.company = data.company;
+    if (data.jobRole !== undefined) updatePayload.jobRole = data.jobRole;
+    if (data.experience !== undefined) updatePayload.experience = data.experience;
+    if (data.location !== undefined) updatePayload.location = data.location;
+    if (data.applyLink !== undefined) {
+        updatePayload.applyLink = normalizeJobUrl(data.applyLink);
+    }
+
+    const [updatedJob] = await db
+        .update(jobs)
+        .set(updatePayload)
+        .where(eq(jobs.id, id))
+        .returning();
+
+    return updatedJob || null;
+}
+
+/**
  * Retrieves a list of jobs from the database based on optional filters:
  * - search: search term in jobRole or company
  * - location: location search term

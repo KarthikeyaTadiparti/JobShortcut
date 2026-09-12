@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useSelector } from 'react-redux'
+import { type RootState } from '@/redux/reducers'
+import { toast } from 'sonner'
 import { motion } from 'framer-motion'
 import {
     Search,
@@ -10,11 +13,13 @@ import {
     Building,
     ChevronLeft,
     ChevronRight,
-    AlertCircle
+    AlertCircle,
+    Edit3
 } from 'lucide-react'
-import { getJobs } from '@/api'
+import { getJobs, updateJob } from '@/api'
 import UserNavbar from '@/components/UserNavbar'
 import UserFooter from '@/components/UserFooter'
+import InlineEdit from '@/components/InlineEdit'
 
 export interface Job {
     id: number;
@@ -45,6 +50,32 @@ function formatRelativeTime(dateString: string): string {
 }
 
 function UserJobs() {
+    const { isAuthenticated } = useSelector((state: RootState) => state.auth)
+    const queryClient = useQueryClient()
+
+    const updateJobMutation = useMutation({
+        mutationFn: async ({ id, data }: { id: number; data: Partial<Job> }) => {
+            return updateJob(id, data);
+        },
+        onSuccess: () => {
+            toast.success("Job updated successfully!");
+            queryClient.invalidateQueries({ queryKey: ['jobs'] });
+        },
+        onError: (err: any) => {
+            console.error("Failed to update job:", err);
+            toast.error(err?.message || "Failed to update job.");
+        }
+    });
+
+    const handleUpdateJobField = (id: number, field: keyof Job, newValue: string) => {
+        updateJobMutation.mutate({
+            id,
+            data: {
+                [field]: newValue.trim() === '' ? null : newValue.trim()
+            }
+        });
+    };
+
     // Search state
     const [searchInput, setSearchInput] = useState('')
     const [locationInput, setLocationInput] = useState('')
@@ -278,36 +309,94 @@ function UserJobs() {
                                         className="group bg-white p-8 rounded-2xl border border-gray-100 hover:border-[#7B61FF]/40 shadow-sm transition-all duration-300 flex flex-col justify-between"
                                     >
                                         <div>
-                                            <div className="flex justify-between items-start gap-4 mb-3">
+                                            <div className="flex justify-between items-center gap-4 mb-3">
                                                 {/* Posted date */}
                                                 <span className="inline-flex items-center gap-1 text-[11px] font-medium text-[#5B6475]/70 font-mono">
                                                     <Clock className="h-3.5 w-3.5 shrink-0" />
                                                     {formatRelativeTime(job.createdAt)}
                                                 </span>
+                                                {isAuthenticated && (
+                                                    <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-[#5B3DF5]/10 text-[#5B3DF5] px-2 py-0.5 rounded-full" title="Double click any field to edit inline">
+                                                        <Edit3 className="h-3 w-3" /> Edit
+                                                    </span>
+                                                )}
                                             </div>
 
-                                            <p className="text-xs font-bold text-[#5B3DF5] mb-2.5 uppercase tracking-widest flex items-center gap-1.5 font-mono">
-                                                <Building className="h-3.5 w-3.5" />
-                                                {job.company || 'Unknown Company'}
-                                            </p>
+                                            <div className="text-xs font-bold text-[#5B3DF5] mb-2.5 uppercase tracking-widest flex items-center gap-1.5 font-mono">
+                                                <Building className="h-3.5 w-3.5 shrink-0" />
+                                                {isAuthenticated ? (
+                                                    <InlineEdit
+                                                        value={job.company || ''}
+                                                        placeholder="Company Name"
+                                                        onSave={(val) => handleUpdateJobField(job.id, 'company', val)}
+                                                        className="block w-full"
+                                                        inputClassName="text-xs font-bold text-[#5B3DF5]"
+                                                    />
+                                                ) : (
+                                                    <span>{job.company || 'Unknown Company'}</span>
+                                                )}
+                                            </div>
 
-                                            <h3 className="text-lg font-bold text-[#111827] group-hover:text-[#5B3DF5] transition-colors line-clamp-2 leading-tight">
-                                                {job.jobRole || 'Unknown Role'}
+                                            <h3 className="text-lg font-bold text-[#111827] group-hover:text-[#5B3DF5] transition-colors leading-tight">
+                                                {isAuthenticated ? (
+                                                    <InlineEdit
+                                                        value={job.jobRole || ''}
+                                                        placeholder="Job Role"
+                                                        onSave={(val) => handleUpdateJobField(job.id, 'jobRole', val)}
+                                                        className="block w-full"
+                                                        inputClassName="text-base font-bold text-[#111827]"
+                                                    />
+                                                ) : (
+                                                    <span className="line-clamp-2">{job.jobRole || 'Unknown Role'}</span>
+                                                )}
                                             </h3>
                                         </div>
 
                                         <div>
                                             {/* Location & Experience */}
-                                            <div className="space-y-2.5 mb-8 border-t border-gray-100 pt-4 font-medium text-[13px] text-[#5B6475]">
+                                            <div className="space-y-2.5 mb-6 border-t border-gray-100 pt-4 font-medium text-[13px] text-[#5B6475]">
                                                 <div className="flex items-center gap-3">
                                                     <MapPin className="h-4.5 w-4.5 text-[#5B6475]/60 shrink-0" />
-                                                    <span>{job.location || 'Not Specified'}</span>
+                                                    {isAuthenticated ? (
+                                                        <InlineEdit
+                                                            value={job.location || ''}
+                                                            placeholder="Location"
+                                                            onSave={(val) => handleUpdateJobField(job.id, 'location', val)}
+                                                            className="block w-full"
+                                                            inputClassName="text-xs"
+                                                        />
+                                                    ) : (
+                                                        <span>{job.location || 'Not Specified'}</span>
+                                                    )}
                                                 </div>
                                                 <div className="flex items-center gap-3">
                                                     <Award className="h-4.5 w-4.5 text-[#5B6475]/60 shrink-0" />
-                                                    <span>{job.experience || 'Experience Not Stated'}</span>
+                                                    {isAuthenticated ? (
+                                                        <InlineEdit
+                                                            value={job.experience || ''}
+                                                            placeholder="Experience"
+                                                            onSave={(val) => handleUpdateJobField(job.id, 'experience', val)}
+                                                            className="block w-full"
+                                                            inputClassName="text-xs"
+                                                        />
+                                                    ) : (
+                                                        <span>{job.experience || 'Experience Not Stated'}</span>
+                                                    )}
                                                 </div>
                                             </div>
+
+                                            {isAuthenticated && (
+                                                <div className="mb-4 text-xs border-t border-gray-100 pt-3">
+                                                    <span className="text-[10px] font-bold uppercase text-[#5B6475]/70 block mb-1 font-mono">Apply Link:</span>
+                                                    <InlineEdit
+                                                        value={job.applyLink || ''}
+                                                        placeholder="Apply Link URL"
+                                                        onSave={(val) => handleUpdateJobField(job.id, 'applyLink', val)}
+                                                        className="text-xs font-mono text-[#5B3DF5] truncate block w-full"
+                                                        inputClassName="text-xs font-mono"
+                                                    />
+                                                </div>
+                                            )}
 
                                             {/* Apply Now button */}
                                             <a

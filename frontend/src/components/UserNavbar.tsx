@@ -1,6 +1,12 @@
 import { useState, useEffect } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useDispatch, useSelector } from 'react-redux'
+import { type RootState } from '@/redux/reducers'
+import { clearUser } from '@/redux/reducers/auth-reducer'
+import { logoutUser } from '@/api'
+import { useMutation } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import {
     Search,
     Briefcase,
@@ -9,14 +15,32 @@ import {
     X,
     Home,
     Settings,
-    Users
+    Users,
+    LogOut,
+    LayoutDashboard
 } from 'lucide-react'
+import { Button } from './ui/button'
 
 function UserNavbar() {
+    const dispatch = useDispatch()
+    const { isAuthenticated } = useSelector((state: RootState) => state.auth)
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
     const [activeSection, setActiveSection] = useState<string>('')
     const location = useLocation()
     const navigate = useNavigate()
+
+    const logoutMutation = useMutation({
+        mutationFn: logoutUser,
+        onSuccess: () => {
+            dispatch(clearUser())
+            toast.success("Logged out successfully!")
+            navigate('/login')
+        },
+        onError: () => {
+            dispatch(clearUser())
+            navigate('/login')
+        }
+    })
 
     useEffect(() => {
         if (mobileMenuOpen) {
@@ -161,6 +185,25 @@ function UserNavbar() {
                     <Link to="/jobs" className={getDesktopClass('/jobs')}>Job Opportunities</Link>
                     <a href="#works" onClick={(e) => handleNavClick(e, 'works')} className={getSectionDesktopClass('works')}>How it works</a>
                     <a href="#about" onClick={(e) => handleNavClick(e, 'about')} className={getSectionDesktopClass('about')}>About us</a>
+                    {isAuthenticated && (
+                        <div className="flex items-center gap-3 border-l border-[#EBE3FF] pl-4">
+                            <Link
+                                to="/admin/scraper"
+                                className="px-3 py-1.5 rounded-xl bg-[#5B3DF5]/10 text-[#5B3DF5] hover:bg-[#5B3DF5]/20 font-bold text-xs flex items-center gap-1.5 transition-all"
+                            >
+                                <LayoutDashboard className="h-3.5 w-3.5" />
+                                Scraper
+                            </Link>
+                            <Button
+                                onClick={() => logoutMutation.mutate()}
+                                disabled={logoutMutation.isPending}
+                                variant="destructive"
+                                className="cursor-pointer font-medium transition-all gap-2">
+                                <LogOut className="h-4 w-4" />
+                                {logoutMutation.isPending ? 'Logging out...' : 'Logout'}
+                            </Button>
+                        </div>
+                    )}
                 </nav>
 
                 {/* Mobile Hamburger Button */}
@@ -257,6 +300,35 @@ function UserNavbar() {
                                 </div>
                                 <span className="text-[16px] font-bold">About Us</span>
                             </a>
+
+                            {isAuthenticated && (
+                                <>
+                                    <div className="h-px w-[95%] bg-[#EBE3FF] opacity-50 mx-auto my-1"></div>
+                                    <Link
+                                        to="/scrapers"
+                                        onClick={() => setMobileMenuOpen(false)}
+                                        className="flex items-center gap-4 w-full p-3 rounded-2xl bg-[#5B3DF5]/5 text-[#5B3DF5]"
+                                    >
+                                        <div className="p-2.5 rounded-xl bg-[#5B3DF5]/10 text-[#5B3DF5]">
+                                            <LayoutDashboard className="h-5 w-5" />
+                                        </div>
+                                        <span className="text-[16px] font-bold">Scraper Dashboard</span>
+                                    </Link>
+                                    <button
+                                        onClick={() => {
+                                            setMobileMenuOpen(false);
+                                            logoutMutation.mutate();
+                                        }}
+                                        disabled={logoutMutation.isPending}
+                                        className="flex items-center gap-4 w-full p-3 rounded-2xl bg-red-500/10 text-red-600 text-left font-bold cursor-pointer"
+                                    >
+                                        <div className="p-2.5 rounded-xl bg-red-500/20 text-red-600">
+                                            <LogOut className="h-5 w-5" />
+                                        </div>
+                                        <span className="text-[16px] font-bold">{logoutMutation.isPending ? 'Logging out...' : 'Logout Admin'}</span>
+                                    </button>
+                                </>
+                            )}
                         </div>
 
                         {/* CTA Action button at bottom */}

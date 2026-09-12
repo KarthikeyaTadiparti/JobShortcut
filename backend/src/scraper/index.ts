@@ -7,6 +7,7 @@ import { extractJobLinks as scrapePlacement } from "./placement_officer_scraper.
 import { extractJobLinks as scrapeFreshersHunt } from "./freshers_hunt_scraper.js";
 import { extractJobLinks as scrapeDailyPharma } from "./dailypharmajobs_scraper.js";
 import { extractJobLinks as scrapeFoundTheJob } from "./found_the_job_scraper.js";
+import { checkApplyLinkExists } from "../services/job-services.js";
 
 export interface ScrapedJob {
   company: string | null;
@@ -15,6 +16,8 @@ export interface ScrapedJob {
   location: string | null;
   applyLinks: string[];
   alreadyExists?: boolean;
+  duplicateLinks?: string[];
+  status?: "scraped" | "duplicate";
 }
 
 /**
@@ -23,25 +26,45 @@ export interface ScrapedJob {
  */
 export async function scrapeUrl(url: string): Promise<ScrapedJob | null> {
   try {
+    let result: ScrapedJob | null = null;
     const parsedUrl = new URL(url);
     const hostname = parsedUrl.hostname.toLowerCase();
 
     if (hostname.includes("jobcode.in")) {
-      return await scrapeJobcode(url);
+      result = await scrapeJobcode(url);
     } else if (hostname.includes("freshersrecruitment.co.in") || hostname.includes("freshersvoice.com") || hostname.includes("fvoice.site")|| hostname.includes("fresheropenings.com") || hostname.includes("fresherscareers.co.in")) {
-      return await scrapeFreshers(url);
+      result = await scrapeFreshers(url);
     } else if (hostname.includes("placement-officer.com")) {
-      return await scrapePlacement(url);
+      result = await scrapePlacement(url);
     } else if (hostname.includes("freshershunt.in")) {
-      return await scrapeFreshersHunt(url);
+      result = await scrapeFreshersHunt(url);
     } else if (hostname.includes("dailypharmajobs.in")) {
-      return await scrapeDailyPharma(url);
+      result = await scrapeDailyPharma(url);
     } else if (hostname.includes("foundthejob.com")) {
-      return await scrapeFoundTheJob(url);
+      result = await scrapeFoundTheJob(url);
     } else {
       console.error(`Unsupported URL domain: ${hostname}`);
       return null;
     }
+
+    if (result) {
+      const duplicateLinks: string[] = [];
+      if (Array.isArray(result.applyLinks) && result.applyLinks.length > 0) {
+        for (const link of result.applyLinks) {
+          const exists = await checkApplyLinkExists(link);
+          if (exists) {
+            duplicateLinks.push(link);
+          }
+        }
+      }
+
+      const isDuplicate = duplicateLinks.length > 0;
+      result.duplicateLinks = duplicateLinks;
+      result.alreadyExists = isDuplicate;
+      result.status = isDuplicate ? "duplicate" : "scraped";
+    }
+
+    return result;
   } catch (error) {
     console.error(`Error matching URL ${url}:`, error);
     return null;

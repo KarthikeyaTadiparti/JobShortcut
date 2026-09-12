@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
 import wrapAsync from "../utils/wrap-async.js";
-import { createJob, checkApplyLinkExists, getJobsList } from "../services/job-services.js";
+import { createJob, updateJob, checkApplyLinkExists, getJobsList } from "../services/job-services.js";
 import ExpressError from "../middlewares/errorhandler.js";
 import { normalizeJobUrl } from "../utils/normalize-url.js";
 
@@ -47,20 +47,37 @@ export const createJobHandler = wrapAsync(async (req: Request, res: Response) =>
     });
 });
 
-// export const getJobsHandler = wrapAsync(async (req: Request, res: Response) => {
-//     const { search, location, filterType } = req.query;
+export const updateJobHandler = wrapAsync(async (req: Request, res: Response) => {
+    const id = Number(req.params.id);
+    if (isNaN(id)) {
+        throw new ExpressError(400, "Invalid job ID");
+    }
 
-//     const data = await getJobsList({
-//         search: typeof search === "string" ? search : undefined,
-//         location: typeof location === "string" ? location : undefined,
-//         filterType: typeof filterType === "string" ? filterType : undefined,
-//     });
+    const addedBy = req.user?.id;
+    if (!addedBy) {
+        throw new ExpressError(401, "Admin must be logged in to update jobs");
+    }
 
-//     return res.status(200).json({
-//         status: true,
-//         data,
-//     });
-// });
+    const { company, jobRole, experience, location, applyLink } = req.body;
+
+    const updatedJob = await updateJob(id, {
+        company: company !== undefined ? company : undefined,
+        jobRole: jobRole !== undefined ? jobRole : undefined,
+        experience: experience !== undefined ? experience : undefined,
+        location: location !== undefined ? location : undefined,
+        applyLink: applyLink !== undefined ? applyLink : undefined,
+    });
+
+    if (!updatedJob) {
+        throw new ExpressError(404, "Job not found or failed to update");
+    }
+
+    return res.status(200).json({
+        status: true,
+        data: updatedJob,
+        message: "Job updated successfully",
+    });
+});
 
 export const getJobsHandler = wrapAsync(async (req: Request, res: Response) => {
     const { page = "1", search, location, filterType } = req.query;

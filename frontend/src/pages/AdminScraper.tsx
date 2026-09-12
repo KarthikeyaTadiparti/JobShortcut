@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react'
+import { useState, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { useSelector } from 'react-redux'
 import { type RootState } from '@/redux/reducers'
@@ -25,64 +25,7 @@ import { Textarea } from "@/components/ui/textarea"
 import AdminNavbar from '@/components/AdminNavbar'
 import WarningDialog from '@/components/WarningDialog'
 import CreateJobDialog from '@/components/CreateJobDialog'
-
-
-interface InlineEditProps {
-    value: string;
-    onSave: (newValue: string) => void;
-    placeholder?: string;
-    className?: string;
-    inputClassName?: string;
-}
-
-function InlineEdit({ value, onSave, placeholder = '', className = '', inputClassName = '' }: InlineEditProps) {
-    const [isEditing, setIsEditing] = useState(false);
-    const [editValue, setEditValue] = useState(value);
-
-    useEffect(() => {
-        setEditValue(value);
-    }, [value]);
-
-    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-        if (e.key === 'Enter') {
-            onSave(editValue);
-            setIsEditing(false);
-        } else if (e.key === 'Escape') {
-            setEditValue(value);
-            setIsEditing(false);
-        }
-    };
-
-    const handleBlur = () => {
-        onSave(editValue);
-        setIsEditing(false);
-    };
-
-    if (isEditing) {
-        return (
-            <input
-                type="text"
-                value={editValue}
-                onChange={(e) => setEditValue(e.target.value)}
-                onKeyDown={handleKeyDown}
-                onBlur={handleBlur}
-                autoFocus
-                placeholder={placeholder}
-                className={`w-full bg-background border border-indigo-500 rounded px-1.5 py-0.5 text-foreground focus:outline-none focus:ring-1 focus:ring-indigo-500 ${inputClassName}`}
-            />
-        );
-    }
-
-    return (
-        <span
-            onDoubleClick={() => setIsEditing(true)}
-            className={`cursor-pointer hover:bg-indigo-500/10 rounded px-1 -mx-1 transition-colors duration-150 select-none ${className}`}
-            title="Double click to edit"
-        >
-            {value || <span className="text-muted-foreground/50 italic">{placeholder || 'Empty'}</span>}
-        </span>
-    );
-}
+import InlineEdit from '@/components/InlineEdit'
 
 interface ScrapedJob {
     company: string | null;
@@ -90,6 +33,9 @@ interface ScrapedJob {
     experience: string | null;
     location: string | null;
     applyLinks: string[];
+    alreadyExists?: boolean;
+    duplicateLinks?: string[];
+    status?: 'scraped' | 'duplicate';
 }
 
 interface ScrapeLog {
@@ -625,6 +571,12 @@ Apply Link:${selectedLink.trim()}`;
                                 const isRejectPending = rejectMutation.isPending && rejectMutation.variables === url
                                 const isCardPending = isApprovePending || isRejectPending
 
+                                const selectedLink = selectedLinks[url] || (jobData.applyLinks && jobData.applyLinks[0]) || ""
+                                const isSelectedLinkDuplicate = jobData.duplicateLinks
+                                    ? jobData.duplicateLinks.includes(selectedLink)
+                                    : jobData.status === 'duplicate'
+                                const isDuplicate = !isApproved && !isRejected && isSelectedLinkDuplicate
+
                                 return (
                                     <div
                                         key={url}
@@ -632,7 +584,9 @@ Apply Link:${selectedLink.trim()}`;
                                             ? "border-emerald-500/30 bg-emerald-500/5 dark:bg-emerald-950/20"
                                             : isRejected
                                                 ? "border-red-500/20 bg-red-500/5 dark:bg-red-950/20 opacity-60"
-                                                : "border-border bg-card/40 dark:bg-card/80 hover:border-border/80 dark:hover:border-indigo-500/30"
+                                                : isDuplicate
+                                                    ? "border-amber-500/30 bg-amber-500/5 dark:bg-amber-950/20"
+                                                    : "border-border bg-card/40 dark:bg-card/80 hover:border-border/80 dark:hover:border-indigo-500/30"
                                             }`}
                                     >
                                         <div className="space-y-4">
@@ -642,9 +596,11 @@ Apply Link:${selectedLink.trim()}`;
                                                     ? "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400"
                                                     : isRejected
                                                         ? "bg-red-500/20 text-red-600 dark:text-red-400"
-                                                        : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                                                        : isDuplicate
+                                                            ? "bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30"
+                                                            : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
                                                     }`}>
-                                                    {isApproved ? 'Approved' : isRejected ? 'Rejected' : 'Scraped'}
+                                                    {isApproved ? 'Approved' : isRejected ? 'Rejected' : isDuplicate ? 'Duplicate' : 'Scraped'}
                                                 </span>
                                                 <div className="flex items-center gap-3">
                                                     <button
@@ -847,10 +803,13 @@ Apply Link:${selectedLink.trim()}`;
                                             <Button
                                                 onClick={() => handleApprove(url, jobData)}
                                                 variant={isApproved ? "default" : "outline"}
-                                                disabled={isCardPending}
-                                                className={`flex-1 gap-1.5 text-xs py-1.5 h-8 cursor-pointer transition-all ${isApproved
-                                                    ? "bg-emerald-600 hover:bg-emerald-500 text-white border-transparent"
-                                                    : "border-border text-foreground hover:bg-emerald-500/10 hover:text-emerald-600 hover:border-emerald-500/30"
+                                                disabled={isCardPending || isDuplicate}
+                                                title={isDuplicate ? "Job apply link already exists in database" : undefined}
+                                                className={`flex-1 gap-1.5 text-xs py-1.5 h-8 transition-all ${isDuplicate
+                                                    ? "opacity-50 cursor-not-allowed border-amber-500/30 text-amber-500 bg-amber-500/5"
+                                                    : isApproved
+                                                        ? "cursor-pointer bg-emerald-600 hover:bg-emerald-500 text-white border-transparent"
+                                                        : "cursor-pointer border-border text-foreground hover:bg-emerald-500/10 hover:text-emerald-600 hover:border-emerald-500/30"
                                                     }`}
                                             >
                                                 {isApprovePending ? (
@@ -858,7 +817,7 @@ Apply Link:${selectedLink.trim()}`;
                                                 ) : (
                                                     <CheckCircle2 className="h-3.5 w-3.5" />
                                                 )}
-                                                Approve
+                                                {isDuplicate ? "Duplicate" : "Approve"}
                                             </Button>
                                             <Button
                                                 onClick={() => handleReject(url)}

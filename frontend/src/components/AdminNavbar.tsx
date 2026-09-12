@@ -1,11 +1,11 @@
 import { Button } from './ui/button'
-import { Sun, Moon, LogOut } from 'lucide-react'
+import { Sun, Moon, LogOut, Briefcase } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { useDispatch, useSelector } from 'react-redux'
 import { clearUser } from '@/redux/reducers/auth-reducer'
 import { logoutUser } from '@/api'
 import { useMutation } from '@tanstack/react-query'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import type { RootState } from '@/redux/reducers'
 
 function AdminNavbar() {
@@ -30,12 +30,14 @@ function AdminNavbar() {
         <header className="border-b border-border bg-card sticky top-0 z-50">
             <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
                 <div className="flex h-16 items-center justify-between">
+                    <Link to="/">
                         <div className="flex items-center gap-3">
                             <img src="/jobshortcut_logo.svg" alt="Job Shortcut Logo" className="h-8 w-auto object-contain" />
                             <span className="text-xl font-bold tracking-tight text-foreground">
                                 Job Shortcut
                             </span>
                         </div>
+                    </Link>
                         <div className="flex items-center gap-4">
                             <Button
                                 onClick={toggleTheme}
@@ -54,15 +56,24 @@ function AdminNavbar() {
                                 <span className="text-sm font-semibold text-foreground">{userData.name || 'Admin'}</span>
                                 <span className="text-xs text-muted-foreground">{userData.email}</span>
                             </div>
-                            <Button
-                                onClick={() => logoutMutation.mutate()}
-                                disabled={logoutMutation.isPending}
-                                variant="destructive"
-                                className="cursor-pointer font-medium transition-all gap-2"
-                            >
-                                <LogOut className="h-4 w-4" />
-                                {logoutMutation.isPending ? 'Logging out...' : 'Logout'}
-                            </Button>
+                            <div className="flex items-center gap-3 border-l border-[#EBE3FF] pl-4 ml-2">
+                                <Link
+                                    to="/jobs"
+                                    className="px-3 py-1.5 rounded-xl bg-[#5B3DF5]/10 text-[#5B3DF5] hover:bg-[#5B3DF5]/20 font-bold text-xs flex items-center gap-1.5 transition-all"
+                                >
+                                    <Briefcase className="h-3.5 w-3.5" />
+                                    Jobs
+                                </Link>
+                                <Button
+                                    onClick={() => logoutMutation.mutate()}
+                                    disabled={logoutMutation.isPending}
+                                    variant="destructive"
+                                    className="cursor-pointer font-medium transition-all gap-2"
+                                >
+                                    <LogOut className="h-4 w-4" />
+                                    {logoutMutation.isPending ? 'Logging out...' : 'Logout'}
+                                </Button>
+                            </div>
                         </div>
                     </div>
                 </div>
