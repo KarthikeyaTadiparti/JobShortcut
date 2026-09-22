@@ -7,6 +7,7 @@ import { extractJobLinks as scrapePlacement } from "./placement_officer_scraper.
 import { extractJobLinks as scrapeFreshersHunt } from "./freshers_hunt_scraper.js";
 import { extractJobLinks as scrapeDailyPharma } from "./dailypharmajobs_scraper.js";
 import { extractJobLinks as scrapeFoundTheJob } from "./found_the_job_scraper.js";
+import { extractJobLinks as scrapeFreshersDunia } from "./freshers_dunia_scraper.js";
 import { checkApplyLinkExists } from "../services/job-services.js";
 
 export interface ScrapedJob {
@@ -42,6 +43,8 @@ export async function scrapeUrl(url: string): Promise<ScrapedJob | null> {
       result = await scrapeDailyPharma(url);
     } else if (hostname.includes("foundthejob.com")) {
       result = await scrapeFoundTheJob(url);
+    } else if (hostname.includes("freshersdunia.in") || hostname.includes("freshersdunia")) {
+      result = await scrapeFreshersDunia(url);
     } else {
       console.error(`Unsupported URL domain: ${hostname}`);
       return null;

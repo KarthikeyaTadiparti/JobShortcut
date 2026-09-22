@@ -394,7 +394,7 @@ Apply Link:${selectedLink.trim()}`;
                                         value={urlInput}
                                         onChange={(e) => setUrlInput(e.target.value)}
                                         disabled={scrapeMutation.isPending}
-                                        placeholder="https://placement-officer.com/job-post, https://dailypharmajobs.in/pharma-job"
+                                        placeholder="https://placement-officer.com/job-post, https://freshersdunia.in/job-post"
                                         className="w-full rounded-xl border border-border bg-background p-4 text-sm text-foreground placeholder-muted-foreground focus:border-indigo-500 focus:outline-none transition-colors resize-y font-mono"
                                     />
                                 </div>
@@ -438,7 +438,9 @@ Apply Link:${selectedLink.trim()}`;
                                         'fresheropenings.com',
                                         'fresherscareers.co.in',
                                         'freshershunt.in',
-                                        'dailypharmajobs.in'
+                                        'dailypharmajobs.in',
+                                        'foundthejob.com',
+                                        'freshersdunia.in'
                                     ].map((domain) => (
                                         <span
                                             key={domain}
