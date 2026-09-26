@@ -14,6 +14,14 @@ import type {
 } from "./whatsapp-types.js";
 
 /**
+ * Helper to pause execution with a randomized human-like jitter duration.
+ */
+export async function randomJitter(minMs = 300, maxMs = 700): Promise<void> {
+    const delay = Math.floor(Math.random() * (maxMs - minMs + 1)) + minMs;
+    await new Promise((resolve) => setTimeout(resolve, delay));
+}
+
+/**
  * Scrolls the WhatsApp conversation message panel strictly inside #main downward repeatedly until reaching the bottom.
  */
 export async function scrollToBottom(page: Page, maxScrollAttempts = 15): Promise<void> {
@@ -58,7 +66,8 @@ export async function scrollToBottom(page: Page, maxScrollAttempts = 15): Promis
                 }
                 prevTop = panel.scrollTop;
                 panel.scrollTop = panel.scrollHeight;
-                await new Promise((r) => setTimeout(r, 200));
+                const jitterDelay = Math.floor(Math.random() * 150) + 150;
+                await new Promise((r) => setTimeout(r, jitterDelay));
             }
         }, maxScrollAttempts);
     } catch (err) {
@@ -266,10 +275,58 @@ export function getSearchCandidates(groupName: string): string[] {
     return candidates;
 }
 
+export interface SearchAndOpenResult {
+    status: "opened" | "skipped_no_unread" | "not_found";
+    unreadCount: number;
+}
+
 /**
- * Searches for a group using the WhatsApp Web search input and selects the chat.
+ * Clears the WhatsApp Web search input box and resets the chat list view.
  */
-export async function searchAndOpenGroup(page: Page, groupName: string): Promise<boolean> {
+export async function clearSearchBox(page: Page): Promise<void> {
+    try {
+        const clearBtn = page
+            .locator(
+                '#side [data-testid="chat-list-search-container"] button, #side button[aria-label="End icon button"], #side button[aria-label="Cancel search"], #side [data-testid="search-cancel-btn"]'
+            )
+            .first();
+
+        if ((await clearBtn.count()) > 0 && (await clearBtn.isVisible())) {
+            await clearBtn.click({ force: true }).catch(() => {});
+            await page.waitForTimeout(100);
+        }
+
+        await page.evaluate(() => {
+            const input = document.querySelector(
+                '#side div[data-testid="chat-list-search-container"] [contenteditable="true"], #side div[data-testid="chat-list-search-container"] input, #side [data-tab="3"], #side [role="textbox"]'
+            ) as HTMLElement;
+            if (input) {
+                if ('value' in input) {
+                    (input as HTMLInputElement).value = '';
+                } else {
+                    input.textContent = '';
+                }
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+                input.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+        });
+
+        await page.keyboard.press("Escape").catch(() => {});
+        await page.waitForTimeout(100);
+    } catch {
+        // ignore
+    }
+}
+
+/**
+ * Searches for a group using the WhatsApp Web search input, extracts unread badge count from search results,
+ * and opens the chat if appropriate.
+ */
+export async function searchAndOpenGroup(
+    page: Page,
+    groupName: string,
+    scope?: ExtractionScope
+): Promise<SearchAndOpenResult> {
     try {
         // 0. Check if group is already open in active conversation header (inside #main ONLY)
         const alreadyOpen = await page.evaluate((targetName) => {
@@ -281,17 +338,17 @@ export async function searchAndOpenGroup(page: Page, groupName: string): Promise
             const h = text.toLowerCase();
             const t = targetName.toLowerCase().trim();
             const prefix = t.replace(/\s*[-–(].*$/, '').trim();
-            return h === t || h.includes(t) || t.includes(h) || h.includes(prefix);
+            return h === t || h.includes(t) || t.includes(h) || (prefix.length >= 3 && h.includes(prefix));
         }, groupName);
 
-        if (alreadyOpen) {
-            return true;
+        if (alreadyOpen && scope !== "unread") {
+            return { status: "opened", unreadCount: 0 };
         }
 
-        // 1. Locate search box
+        // 1. Locate search box strictly inside #side
         const searchBox = page
             .locator(
-                'div[data-testid="chat-list-search-container"] input, [data-testid="chat-list-search-container"] [role="textbox"], input[data-tab="3"], [data-testid="chat-list-search"], #side [role="textbox"], input[role="textbox"]'
+                '#side div[data-testid="chat-list-search-container"] [contenteditable="true"], #side div[data-testid="chat-list-search-container"] input, #side [data-tab="3"], #side [data-testid="chat-list-search"], #side [role="textbox"]'
             )
             .first();
 
@@ -305,64 +362,87 @@ export async function searchAndOpenGroup(page: Page, groupName: string): Promise
             await searchBox.click({ force: true });
             await page.waitForTimeout(100);
 
-            // Click clear icon button if present
-            const clearBtn = page
-                .locator(
-                    '[data-testid="chat-list-search-container"] button, button[aria-label="End icon button"]'
-                )
-                .first();
+            await clearSearchBox(page);
+            await page.waitForTimeout(100);
 
-            if ((await clearBtn.count()) > 0 && (await clearBtn.isVisible())) {
-                await clearBtn.click({ force: true }).catch(() => {});
-                await page.waitForTimeout(150);
+            // 3. Type search term using keyboard with randomized human-like keystroke intervals
+            const charDelay = Math.floor(Math.random() * 35) + 35; // 35ms - 70ms per character
+            await page.keyboard.type(searchTerm, { delay: charDelay });
+            await randomJitter(800, 1500);
+
+            // 4. Inspect search results for matching row & unread badge
+            const matchInfo = await page.evaluate((targetName) => {
+                const pane = document.querySelector('#pane-side, [data-testid="chat-list"], [aria-label="Search results."]');
+                if (!pane) return null;
+
+                const lowerTarget = targetName.toLowerCase().trim();
+                const prefix = lowerTarget.replace(/\s*[-–(].*$/, '').trim();
+                const rows = Array.from(pane.querySelectorAll('[role="row"], [data-testid^="list-item-"]'));
+
+                for (const [i, row] of rows.entries()) {
+                    if (!row) continue;
+                    const titleSpan = row.querySelector('[data-testid="cell-frame-title"] span, span[title]');
+                    const title = (titleSpan?.getAttribute('title') || row.textContent || '').toLowerCase().trim();
+
+                    if (
+                        title === lowerTarget ||
+                        title.includes(lowerTarget) ||
+                        lowerTarget.includes(title) ||
+                        (prefix.length >= 3 && title.includes(prefix))
+                    ) {
+                        let count = 0;
+                        const unreadEl = row.querySelector(
+                            '[data-testid="icon-unread-count"], span[role="status"], span.x140p0ai'
+                        );
+                        if (unreadEl) {
+                            const label = unreadEl.getAttribute('aria-label') || unreadEl.textContent || '';
+                            const match = label.match(/\d+/);
+                            if (match) count = parseInt(match[0], 10);
+                        }
+                        return { rowIndex: i, unreadCount: count };
+                    }
+                }
+                return null;
+            }, groupName);
+
+            // If no match found under this candidate term, try the next candidate
+            if (!matchInfo) {
+                continue;
             }
 
-            // Clear existing query via DOM and keyboard
-            await page.evaluate(() => {
-                const input = document.querySelector('div[data-testid="chat-list-search-container"] input, input[data-tab="3"]') as HTMLInputElement;
-                if (input) {
-                    input.value = '';
-                    input.dispatchEvent(new Event('input', { bubbles: true }));
-                    input.dispatchEvent(new Event('change', { bubbles: true }));
-                }
-            });
-            await page.keyboard.press("Control+A");
-            await page.keyboard.press("Backspace");
-            await page.waitForTimeout(150);
+            // If in unread scope and unread count is 0, skip opening and return
+            if (scope === "unread" && matchInfo.unreadCount === 0) {
+                await clearSearchBox(page);
+                return { status: "skipped_no_unread", unreadCount: 0 };
+            }
 
-            // 3. Type search term using keyboard
-            await page.keyboard.type(searchTerm, { delay: 40 });
-            await page.waitForTimeout(1500);
-
-            // 4. Try opening the chat:
-            // Attempt A: Playwright locator click on cell-frame-title or span[title]
+            // 5. Try opening the chat:
             const escaped = escapeRegex(searchTerm);
             const chatRowLocator = page
-                .locator('#pane-side [role="row"], [data-testid="chat-list"] [role="row"]')
+                .locator('#pane-side [role="row"], [data-testid="chat-list"] [role="row"], [aria-label="Search results."] [role="row"]')
                 .filter({ has: page.locator(`[data-testid="cell-frame-title"], span[title]`).filter({ hasText: new RegExp(escaped, 'i') }) })
                 .first();
 
             if ((await chatRowLocator.count()) > 0) {
                 await chatRowLocator.click({ force: true }).catch(() => {});
             } else {
-                // Attempt B: Click nth(1) which is first chat item under "Chats" header
-                const firstResult = page
-                    .locator('[aria-label="Search results."] [role="row"], [data-testid="chat-list"] [role="row"]')
-                    .nth(1);
-                if ((await firstResult.count()) > 0) {
-                    await firstResult.click({ force: true }).catch(() => {});
+                const rowLocator = page
+                    .locator('#pane-side [role="row"], [data-testid="chat-list"] [role="row"], [aria-label="Search results."] [role="row"]')
+                    .nth(matchInfo.rowIndex);
+                if ((await rowLocator.count()) > 0) {
+                    await rowLocator.click({ force: true }).catch(() => {});
                 } else {
                     await page.keyboard.press("Enter");
                 }
             }
 
-            // 5. Wait for conversation panel to be visible inside #main
+            // 6. Wait for conversation panel to be visible inside #main
             await page.waitForSelector('#main [data-testid="conversation-panel-messages"], #main .copyable-area, #main', {
                 state: "visible",
                 timeout: 6000,
             }).catch(() => {});
 
-            // 6. Verify if conversation is opened with the target group title
+            // 7. Verify if conversation is opened with the target group title
             const isNowOpen = await page.evaluate((targetName) => {
                 const header = document.querySelector(
                     '#main [data-testid="conversation-info-header-chat-title"], #main [data-testid="conversation-header"]'
@@ -381,19 +461,21 @@ export async function searchAndOpenGroup(page: Page, groupName: string): Promise
                 // Focus conversation pane on the right so keyboard/wheel events target #main
                 await page.locator('#main header, #main [data-testid="conversation-header"]').first().click({ force: true }).catch(() => {});
                 await page.hover('#main [data-testid="conversation-panel-messages"], #main').catch(() => {});
-                await page.waitForTimeout(300);
-                return true;
+                await randomJitter(300, 600);
+                return { status: "opened", unreadCount: matchInfo.unreadCount };
             }
         }
 
+        // If not found after checking all search terms
+        await clearSearchBox(page);
         console.warn(`Group '${groupName}' could not be found or opened from search results.`);
-        return false;
+        return { status: "not_found", unreadCount: 0 };
     } catch (error) {
         console.warn(`Failed to search and open group '${groupName}':`, error);
-        return false;
+        await clearSearchBox(page);
+        return { status: "not_found", unreadCount: 0 };
     }
 }
-
 
 /**
  * Extracts unread message count from group row in chat list.
@@ -685,40 +767,35 @@ export async function scrapeWhatsAppLinks(
             });
 
             try {
-                // Check unread count first if in 'unread' mode
-                let unreadCount = 0;
-                if (scope === "unread") {
-                    unreadCount = await getGroupUnreadCount(page, group.groupName);
-                    if (unreadCount === 0) {
-                        const skipResult: GroupScrapeResult = {
-                            groupName: group.groupName,
-                            targetDomain: group.targetDomain,
-                            status: "skipped",
-                            unreadCount: 0,
-                            extractedLinks: [],
-                            warning: "No unread messages detected",
-                        };
-                        groupResults.push(skipResult);
-                        skippedGroups++;
-                        emit({
-                            type: "group_complete",
-                            groupName: group.groupName,
-                            result: skipResult,
-                        });
-                        continue;
-                    }
-                }
-
-                // Search and open group
+                // Search and open group (extracts unread badge during search)
                 emit({
                     type: "group_progress",
                     groupName: group.groupName,
                     message: `Searching for group '${group.groupName}'...`,
-                    unreadCount: scope === "unread" ? unreadCount : undefined,
                 });
 
-                const opened = await searchAndOpenGroup(page, group.groupName);
-                if (!opened) {
+                const searchResult = await searchAndOpenGroup(page, group.groupName, scope);
+
+                if (searchResult.status === "skipped_no_unread") {
+                    const skipResult: GroupScrapeResult = {
+                        groupName: group.groupName,
+                        targetDomain: group.targetDomain,
+                        status: "skipped",
+                        unreadCount: 0,
+                        extractedLinks: [],
+                        warning: "No unread messages detected",
+                    };
+                    groupResults.push(skipResult);
+                    skippedGroups++;
+                    emit({
+                        type: "group_complete",
+                        groupName: group.groupName,
+                        result: skipResult,
+                    });
+                    continue;
+                }
+
+                if (searchResult.status === "not_found") {
                     const notFoundResult: GroupScrapeResult = {
                         groupName: group.groupName,
                         targetDomain: group.targetDomain,
@@ -735,6 +812,8 @@ export async function scrapeWhatsAppLinks(
                     });
                     continue;
                 }
+
+                const unreadCount = searchResult.unreadCount;
 
                 // Wait for message elements to mount in conversation panel
                 await page.waitForSelector(
@@ -848,6 +927,9 @@ export async function scrapeWhatsAppLinks(
                     groupName: group.groupName,
                     result: successResult,
                 });
+
+                // Human-like inter-group jitter delay before processing the next group
+                await randomJitter(800, 1800);
             } catch (groupError: any) {
                 console.error(`Error processing group '${group.groupName}':`, groupError);
                 const errResult: GroupScrapeResult = {
@@ -864,6 +946,7 @@ export async function scrapeWhatsAppLinks(
                     groupName: group.groupName,
                     result: errResult,
                 });
+                await randomJitter(600, 1200);
             }
         }
 

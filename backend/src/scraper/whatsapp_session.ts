@@ -23,7 +23,7 @@ export interface WhatsAppSessionContext {
 }
 
 /**
- * Launches a persistent Playwright Chromium browser context for WhatsApp Web.
+ * Launches a persistent Playwright Chromium browser context for WhatsApp Web with stealth anti-detection masks.
  */
 export async function launchWhatsAppContext(options: {
     headless?: boolean | undefined;
@@ -34,10 +34,13 @@ export async function launchWhatsAppContext(options: {
 
     const context = await chromium.launchPersistentContext(sessionDir, {
         headless,
+        ignoreDefaultArgs: ["--enable-automation"],
         viewport: { width: 1366, height: 768 },
         userAgent:
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
         args: [
+            "--disable-blink-features=AutomationControlled",
+            "--disable-infobars",
             "--no-sandbox",
             "--disable-setuid-sandbox",
             "--disable-dev-shm-usage",
@@ -46,6 +49,29 @@ export async function launchWhatsAppContext(options: {
             "--no-zygote",
             "--disable-gpu",
         ],
+    });
+
+    // Stealth init script: mask navigator.webdriver and standardize browser attributes
+    await context.addInitScript(() => {
+        // Mask navigator.webdriver
+        Object.defineProperty(navigator, 'webdriver', {
+            get: () => undefined,
+        });
+
+        // Ensure plugins & languages look like a standard user browser
+        Object.defineProperty(navigator, 'languages', {
+            get: () => ['en-US', 'en'],
+        });
+
+        // Mock window.chrome runtime
+        if (!(window as any).chrome) {
+            (window as any).chrome = {
+                runtime: {},
+                loadTimes: function() {},
+                csi: function() {},
+                app: {},
+            };
+        }
     });
 
     const pages = context.pages();
