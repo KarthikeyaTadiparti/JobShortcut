@@ -19,12 +19,14 @@ import {
     Check,
     X,
     Copy,
+    Radio,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Textarea } from "@/components/ui/textarea"
 import AdminNavbar from '@/components/AdminNavbar'
 import WarningDialog from '@/components/WarningDialog'
 import CreateJobDialog from '@/components/CreateJobDialog'
+import WhatsAppImportModal from '@/components/WhatsAppImportModal'
 import InlineEdit from '@/components/InlineEdit'
 
 interface ScrapedJob {
@@ -143,6 +145,19 @@ function Scraper() {
     const [showDialog, setShowDialog] = useState(false)
     const [dialogMessage, setDialogMessage] = useState('')
     const [showCreateDialog, setShowCreateDialog] = useState(false)
+    const [showWhatsAppModal, setShowWhatsAppModal] = useState(false)
+
+    const handleWhatsAppImportComplete = (importedUrls: string[]) => {
+        if (!importedUrls || importedUrls.length === 0) return
+        setUrlInput((prev) => {
+            const currentList = prev
+                .split(',')
+                .map((u) => u.trim())
+                .filter(Boolean)
+            const combined = Array.from(new Set([...currentList, ...importedUrls]))
+            return combined.join(', ')
+        })
+    }
 
     const approveMutation = useMutation({
         mutationFn: async ({ jobData, selectedLink }: { url: string; jobData: ScrapedJob; selectedLink: string }) => {
@@ -364,13 +379,22 @@ Apply Link:${selectedLink.trim()}`;
                             Extract jobs automatically or add them manually to your tracker database.
                         </p>
                     </div>
-                    <Button
-                        onClick={() => setShowCreateDialog(true)}
-                        className="cursor-pointer bg-indigo-600 hover:bg-indigo-500 text-white font-medium gap-2 px-4 py-5 rounded-lg transition-all self-start sm:self-center"
-                    >
-                        <Plus className="h-4 w-4" />
-                        Create Job
-                    </Button>
+                    <div className="flex items-center gap-3 self-start sm:self-center">
+                        <Button
+                            onClick={() => setShowWhatsAppModal(true)}
+                            className="cursor-pointer bg-emerald-600 hover:bg-emerald-500 text-white font-medium gap-2 px-4 py-5 rounded-lg transition-all"
+                        >
+                            <Radio className="h-4 w-4" />
+                            Import from WhatsApp
+                        </Button>
+                        <Button
+                            onClick={() => setShowCreateDialog(true)}
+                            className="cursor-pointer bg-indigo-600 hover:bg-indigo-500 text-white font-medium gap-2 px-4 py-5 rounded-lg transition-all"
+                        >
+                            <Plus className="h-4 w-4" />
+                            Create Job
+                        </Button>
+                    </div>
                 </div>
 
                 <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
@@ -860,6 +884,13 @@ Apply Link:${selectedLink.trim()}`;
 
             {/* Create Job Manual Dialog Modal */}
             <CreateJobDialog isOpen={showCreateDialog} onClose={() => setShowCreateDialog(false)} />
+
+            {/* WhatsApp Import Modal */}
+            <WhatsAppImportModal
+                isOpen={showWhatsAppModal}
+                onClose={() => setShowWhatsAppModal(false)}
+                onImportComplete={handleWhatsAppImportComplete}
+            />
         </div>
     )
 }
