@@ -11,7 +11,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
-    "scrape": "tsx src/scraper/index.ts"
+    "scrape": "tsx src/scraper/index.ts",
+    "scrape:whatsapp": "tsx src/scraper/whatsapp_cli.ts"
   },
   "keywords": [],
   "author": "",

@@ -7,7 +7,8 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "server": "cd backend && npm run dev",
     "client": "cd frontend && npm run dev",
-    "studio": "cd backend && npm run db:studio"
+    "studio": "cd backend && npm run db:studio",
+    "scrape:whatsapp": "npm --prefix backend run scrape:whatsapp --"
   },
   "repository": {
     "type": "git",

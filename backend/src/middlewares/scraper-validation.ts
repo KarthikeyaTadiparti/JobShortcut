@@ -41,3 +41,14 @@ export function validateScraperUrls(req: Request, res: Response, next: NextFunct
     req.urlsArray = urlsArray;
     next();
 }
+
+/**
+ * Middleware to validate WhatsApp scraping scope parameter.
+ */
+export function validateWhatsAppScope(req: Request, _res: Response, next: NextFunction) {
+    const { scope } = req.body;
+    if (scope && !['unread', 'today', 'yesterday'].includes(scope)) {
+        throw new ExpressError(400, "Invalid scope. Supported values are: 'unread', 'today', 'yesterday'.");
+    }
+    next();
+}

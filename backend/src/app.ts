@@ -34,6 +34,7 @@ app.get("/", (_req, res) => {
 app.use("/api/auth", authRouter);
 app.use("/api/admins", adminRouter);
 app.use("/api/scrapers", scraperRouter);
+app.use("/api/scraper", scraperRouter);
 app.use("/api/jobs", jobsRouter);
 
 // 404 Error handler
