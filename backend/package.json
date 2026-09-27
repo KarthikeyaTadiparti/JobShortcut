@@ -12,7 +12,12 @@
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "scrape": "tsx src/scraper/index.ts",
-    "scrape:whatsapp": "tsx src/scraper/whatsapp_cli.ts"
+    "scrape:whatsapp": "tsx src/scraper/whatsapp_cli.ts",
+    "test:locators": "playwright test",
+    "test:locators:auth": "playwright test tests/auth-locators.spec.ts",
+    "test:locators:chat": "playwright test tests/chat-locators.spec.ts",
+    "test:locators:report": "playwright show-report",
+    "extract:dom": "tsx src/scripts/extract_whatsapp_dom.ts"
   },
   "keywords": [],
   "author": "",
@@ -34,6 +39,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@types/bcrypt": "^6.0.0",
     "@types/cookie-parser": "^1.4.10",
     "@types/cors": "^2.8.19",

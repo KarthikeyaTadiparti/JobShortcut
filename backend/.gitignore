@@ -1,4 +1,10 @@
 node_modules/
 .env    
 dist
-.whatsapp_session/
+.whatsapp_session/
+playwright-report/
+test-results/
+artifacts/
+*.html
+*.json.bak
+

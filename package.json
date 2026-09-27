@@ -8,7 +8,12 @@
     "server": "cd backend && npm run dev",
     "client": "cd frontend && npm run dev",
     "studio": "cd backend && npm run db:studio",
-    "scrape:whatsapp": "npm --prefix backend run scrape:whatsapp --"
+    "scrape:whatsapp": "npm --prefix backend run scrape:whatsapp --",
+    "test:locators": "npm --prefix backend run test:locators",
+    "test:locators:auth": "npm --prefix backend run test:locators:auth",
+    "test:locators:chat": "npm --prefix backend run test:locators:chat",
+    "test:locators:report": "npm --prefix backend run test:locators:report",
+    "extract:dom": "npm --prefix backend run extract:dom --"
   },
   "repository": {
     "type": "git",
