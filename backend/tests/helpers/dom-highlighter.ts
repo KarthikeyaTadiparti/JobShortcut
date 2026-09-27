@@ -23,6 +23,10 @@ export async function highlightElement(locator: Locator, durationMs = 300): Prom
       htmlEl.style.boxShadow = "0 0 14px #00E676";
       htmlEl.style.transition = "outline 0.1s ease-in, box-shadow 0.1s ease-in";
       htmlEl.scrollIntoView({ behavior: "auto", block: "nearest", inline: "nearest" });
+      if (htmlEl.tagName === "INPUT" && htmlEl.parentElement) {
+        htmlEl.parentElement.style.outline = "3px solid #00E676";
+        htmlEl.parentElement.style.boxShadow = "0 0 14px #00E676";
+      }
     }).catch(() => {});
 
     // Visual dwell for frame capture
@@ -36,6 +40,10 @@ export async function highlightElement(locator: Locator, durationMs = 300): Prom
       htmlEl.style.outline = "";
       htmlEl.style.boxShadow = "";
       htmlEl.style.transition = "";
+      if (htmlEl.tagName === "INPUT" && htmlEl.parentElement) {
+        htmlEl.parentElement.style.outline = "";
+        htmlEl.parentElement.style.boxShadow = "";
+      }
     }).catch(() => {});
   } catch {
     // Non-fatal if element detaches during evaluation

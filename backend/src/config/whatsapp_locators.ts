@@ -19,7 +19,8 @@ export type ElementCategory =
   | "conversation_header"
   | "messages"
   | "date_headers"
-  | "links";
+  | "links"
+  | "channels";
 
 export interface LocatorDefinition {
   id: string;
@@ -32,7 +33,37 @@ export interface LocatorDefinition {
   requiresParent?: string;
 }
 
-export const WHATSAPP_LOCATORS: Record<string, LocatorDefinition> = {
+export type LocatorKey =
+  | "qrCanvas"
+  | "loginInstructions"
+  | "loginContainer"
+  | "chatListSearchInput"
+  | "chatListSearchClearBtn"
+  | "chatsTabBtn"
+  | "chatListContainer"
+  | "chatListRow"
+  | "chatRowTitle"
+  | "chatRowUnreadBadge"
+  | "conversationHeader"
+  | "conversationChatTitle"
+  | "conversationPanelMessages"
+  | "messageContainer"
+  | "copyableText"
+  | "dateDividerSpan"
+  | "messageAnchorLink"
+  | "channelsTabBtn"
+  | "channelsListContainer"
+  | "channelsSearchInput"
+  | "channelListRow"
+  | "channelRowTitle"
+  | "channelRowUnreadBadge"
+  | "channelHeader"
+  | "channelChatTitle"
+  | "channelMessageContainer"
+  | "channelCopyableText"
+  | "channelMessageLink";
+
+export const WHATSAPP_LOCATORS: Record<LocatorKey, LocatorDefinition> = {
   // ---------------------------------------------------------------------------
   // AUTHENTICATION & LOGIN SCREEN
   // ---------------------------------------------------------------------------
@@ -109,9 +140,27 @@ export const WHATSAPP_LOCATORS: Record<string, LocatorDefinition> = {
       '#side button[aria-label="Cancel search"]',
       '#side button[aria-label="End icon button"]',
       '#side [data-testid="search-cancel-btn"]',
+      '#side [data-testid="search-cancel"]',
+      'button[aria-label="Cancel search"]',
+      'span[data-icon="x"]',
+      'span[data-icon="x-alt"]',
     ],
     isOptional: true,
     requiresParent: "#side",
+  },
+  chatsTabBtn: {
+    id: "chatsTabBtn",
+    name: "Chats Navigation Rail Button",
+    category: "navigation_search",
+    description: "Sidebar rail button to navigate to the Chats view.",
+    primary: 'button[aria-label="Chats"], button[aria-label="Chats "], [data-testid="menu-bar-chats"]',
+    fallbacks: [
+      'span[data-icon="chats"]',
+      'span[data-icon="chat"]',
+      'button[aria-label*="Chat" i]',
+      'div[role="navigation"] button:has([data-icon="chats"])',
+      'div[role="navigation"] button:has([data-icon="chat"])',
+    ],
   },
 
   // ---------------------------------------------------------------------------
@@ -278,4 +327,174 @@ export const WHATSAPP_LOCATORS: Record<string, LocatorDefinition> = {
     isOptional: true,
     requiresParent: "#main",
   },
+
+  // ---------------------------------------------------------------------------
+  // WHATSAPP CHANNELS NAVIGATION & BROADCAST FEED
+  // ---------------------------------------------------------------------------
+  channelsTabBtn: {
+    id: "channelsTabBtn",
+    name: "Channels / Updates Navigation Rail Button",
+    category: "channels",
+    description: "Sidebar rail button to navigate to the Channels / Updates view.",
+    primary: 'button[aria-label="Channels"], button[aria-label="Updates"], [data-testid="menu-bar-chats-channels"]',
+    fallbacks: [
+      'span[data-icon="newsletter"]',
+      'span[data-icon="updates"]',
+      'span[data-icon="status-v3-unread"]',
+      'span[data-icon="status-v3"]',
+      'button[aria-label*="Channel" i]',
+      'button[aria-label*="Update" i]',
+      'div[role="navigation"] button:has([data-icon="newsletter"])',
+      'div[role="navigation"] button:has([data-icon="updates"])',
+    ],
+  },
+  channelsListContainer: {
+    id: "channelsListContainer",
+    name: "Channels List Container",
+    category: "channels",
+    description: "Left sidebar pane housing followed channels and updates.",
+    primary: 'div[aria-label="Channel list"], div[data-testid="channel-list"]',
+    fallbacks: [
+      '#side [aria-label*="Channel" i]',
+      'div[role="navigation"]',
+      "#pane-side",
+      "#side",
+    ],
+  },
+  channelsSearchInput: {
+    id: "channelsSearchInput",
+    name: "Channels Filter / Search Input",
+    category: "channels",
+    description: "Search/filter input box at top of Channels list view.",
+    primary: 'input[aria-label="Search"], input[placeholder="Search"], div[data-testid="chat-list-search-container"] input',
+    fallbacks: [
+      'div[data-testid="chat-list-search-container"] input[role="textbox"]',
+      '#side div[data-testid="chat-list-search-container"] input',
+      'input[placeholder*="Search" i]',
+      'input[role="textbox"]',
+    ],
+    isOptional: true,
+  },
+  channelListRow: {
+    id: "channelListRow",
+    name: "Channel Item Row",
+    category: "channels",
+    description: "Individual channel item in the followed channels list.",
+    primary: '[aria-label="Channel list"] [role="listitem"], [data-testid="newsletter-tab-newsletter-cell"], [aria-label="Channel list"] [role="button"], div[role="listitem"][data-testid^="list-item-"]',
+    fallbacks: [
+      'div[aria-label$="Channel"][role="button"]',
+      'div[aria-label*="Channel" i][role="button"]',
+      'div[role="listitem"]',
+      '#side [role="row"]',
+    ],
+  },
+  channelRowTitle: {
+    id: "channelRowTitle",
+    name: "Channel Row Title",
+    category: "channels",
+    description: "Title text element inside a channel row.",
+    primary: '[data-testid="cell-frame-title"] span, span[title], span[dir="auto"]',
+    fallbacks: [
+      'div[role="gridcell"] span',
+      'div[role="gridcell"]',
+      'span',
+    ],
+  },
+  channelRowUnreadBadge: {
+    id: "channelRowUnreadBadge",
+    name: "Channel Unread Count Badge",
+    category: "channels",
+    description: "Green unread message count badge on channel item.",
+    primary: '[data-testid="icon-unread-count"]',
+    fallbacks: [
+      'span[aria-label*="unread message" i]',
+      'span[aria-label*="unread" i]',
+      'span[aria-label*="Unread"]',
+      '[data-testid="cell-frame-secondary"] [aria-label*="unread" i]',
+      'span[role="status"]',
+    ],
+    isOptional: true,
+  },
+  channelHeader: {
+    id: "channelHeader",
+    name: "Channel Feed Header",
+    category: "channels",
+    description: "Top header of the active channel feed showing channel details.",
+    primary: '#main header, div[data-testid="conversation-header"]',
+    fallbacks: [
+      '#main [data-testid="conversation-header"]',
+      "#main",
+    ],
+  },
+  channelChatTitle: {
+    id: "channelChatTitle",
+    name: "Active Channel Title",
+    category: "channels",
+    description: "Title text element inside the channel header.",
+    primary: '#main [data-testid="conversation-info-header-chat-title"], #main header span[title]',
+    fallbacks: [
+      '#main [data-testid="conversation-header"] h2',
+      "#main header span[title]",
+      "#main header h2",
+      "#main header span[dir='auto']",
+      "#main header span",
+    ],
+  },
+  channelMessageContainer: {
+    id: "channelMessageContainer",
+    name: "Channel Broadcast Message Bubble",
+    category: "channels",
+    description: "Container housing a broadcast message post inside the channel feed.",
+    primary: '#main div[data-testid^="conv-msg-"]',
+    fallbacks: [
+      '#main div[data-testid="msg-container"]',
+      "#main div.copyable-text",
+      '#main div[role="row"]',
+      '#main .message-in',
+    ],
+    requiresParent: "#main",
+  },
+  channelCopyableText: {
+    id: "channelCopyableText",
+    name: "Channel Message Text Content",
+    category: "channels",
+    description: "Text element holding post body text.",
+    primary: "#main div.copyable-text",
+    fallbacks: [
+      "#main [data-pre-plain-text]",
+      '#main [data-testid="selectable-text"]',
+      "span.selectable-text",
+      '#main div[dir="ltr"]',
+    ],
+    requiresParent: "#main",
+  },
+  channelMessageLink: {
+    id: "channelMessageLink",
+    name: "Channel Message Hyperlink Anchor",
+    category: "channels",
+    description: "Anchor tag (a[href]) embedded inside channel broadcast posts.",
+    primary: '#main [data-testid^="conv-msg-"] a[href], #main [data-testid="msg-container"] a[href]',
+    fallbacks: [
+      '#main a[href^="http"]',
+      "#main div.copyable-text a[href]",
+      "#main a[href]",
+    ],
+    isOptional: true,
+    requiresParent: "#main",
+  },
 };
+
+/**
+ * Returns an array containing the primary selector followed by all fallback selectors for a given locator definition.
+ */
+export function getLocatorSelectors(def: LocatorDefinition): string[] {
+  return [def.primary, ...def.fallbacks];
+}
+
+/**
+ * Resolves all selectors (primary + fallbacks) for a locator definition into a single comma-separated selector string.
+ */
+export function getCombinedSelector(def: LocatorDefinition): string {
+  return [def.primary, ...def.fallbacks].join(', ');
+}
+

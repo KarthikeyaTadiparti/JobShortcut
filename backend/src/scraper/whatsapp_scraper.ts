@@ -1,5 +1,18 @@
-import { type Page, type Locator } from "playwright";
-import { DEFAULT_WHATSAPP_GROUPS, type WhatsAppGroupConfig } from "../config/whatsapp-groups.js";
+import { type Page } from "playwright";
+import {
+    DEFAULT_WHATSAPP_SOURCES,
+    DEFAULT_WHATSAPP_GROUPS,
+    DEFAULT_WHATSAPP_CHANNELS,
+    type WhatsAppSourceType,
+    type WhatsAppSourceConfig,
+    type WhatsAppGroupConfig,
+    type WhatsAppChannelConfig,
+} from "../config/whatsapp-sources.js";
+import {
+    WHATSAPP_LOCATORS,
+    getLocatorSelectors,
+    getCombinedSelector,
+} from "../config/whatsapp_locators.js";
 import {
     launchWhatsAppContext,
     checkWhatsAppAuthState,
@@ -9,7 +22,9 @@ import type {
     ExtractionScope,
     WhatsAppScrapeOptions,
     WhatsAppImportResult,
+    SourceScrapeResult,
     GroupScrapeResult,
+    WhatsAppSSEEvent,
     WhatsAppEventCallback,
 } from "./whatsapp-types.js";
 
@@ -22,62 +37,126 @@ export async function randomJitter(minMs = 300, maxMs = 700): Promise<void> {
 }
 
 /**
- * Scrolls the WhatsApp conversation message panel strictly inside #main downward repeatedly until reaching the bottom.
+ * Ensures any active search or filter input state is cleanly sanitized and reset prior to typing.
+ * Handles overlays, cancel buttons, and clears both input and contenteditable search boxes.
  */
-export async function scrollToBottom(page: Page, maxScrollAttempts = 15): Promise<void> {
+export async function clearActiveSearchInput(page: Page): Promise<void> {
     try {
-        await page.evaluate(async (maxAttempts) => {
-            const main = document.querySelector('#main');
-            if (!main) return;
+        // 1. Press Escape to dismiss active search popups, overlays, or reset focus
+        await page.keyboard.press("Escape").catch(() => { });
+        await randomJitter(150, 250);
 
-            // Find scrollable element strictly inside #main (right conversation pane)
-            const candidates = [
-                main.querySelector('[data-testid="conversation-panel-messages"]'),
-                main.querySelector('[data-testid="conversation-panel-body"] [tabindex="0"]'),
-                main.querySelector('.copyable-area [tabindex="0"]'),
-                main.querySelector('.copyable-area'),
-                main.querySelector('div[tabindex="0"]'),
-                ...Array.from(main.querySelectorAll('div')).filter((el) => {
-                    const style = window.getComputedStyle(el);
-                    return (
-                        (style.overflowY === 'scroll' || style.overflowY === 'auto') &&
-                        el.scrollHeight > el.clientHeight
-                    );
-                }),
-            ];
+        // 2. Locate and click any search clear / cancel button from WHATSAPP_LOCATORS
+        const clearBtnSelectors = getLocatorSelectors(WHATSAPP_LOCATORS.chatListSearchClearBtn);
 
-            let panel: HTMLElement | null = null;
-            for (const c of candidates) {
-                if (c && (c as HTMLElement).scrollHeight > (c as HTMLElement).clientHeight) {
-                    panel = c as HTMLElement;
-                    break;
+        for (const sel of clearBtnSelectors) {
+            const btn = page.locator(sel).first();
+            if ((await btn.count()) > 0 && (await btn.isVisible().catch(() => false))) {
+                await btn.click({ force: true }).catch(() => { });
+                await page.waitForTimeout(100);
+                break;
+            }
+        }
+
+        // 3. Clear any active search input element via DOM manipulation and keyboard fallback
+        const searchInputSelector = getCombinedSelector(WHATSAPP_LOCATORS.chatListSearchInput);
+        await page.evaluate((selector) => {
+            const inputs = document.querySelectorAll(selector);
+            for (const input of Array.from(inputs)) {
+                const el = input as HTMLElement;
+                if ('value' in el) {
+                    (el as HTMLInputElement).value = '';
+                } else {
+                    el.textContent = '';
                 }
+                el.dispatchEvent(new Event('input', { bubbles: true }));
+                el.dispatchEvent(new Event('change', { bubbles: true }));
             }
+        }, searchInputSelector).catch(() => { });
 
-            if (!panel) {
-                panel = (main.querySelector('[data-testid="conversation-panel-messages"]') || main) as HTMLElement;
-            }
+        // 4. Secondary escape press to ensure state settles
+        await page.keyboard.press("Escape").catch(() => { });
+        await page.waitForTimeout(100);
+    } catch {
+        // Non-fatal sanitization error
+    }
+}
 
-            let prevTop = -1;
-            for (let i = 0; i < maxAttempts; i++) {
-                const atBottom = panel.scrollTop + panel.clientHeight >= panel.scrollHeight - 25;
-                if (atBottom || panel.scrollTop === prevTop) {
-                    break;
-                }
-                prevTop = panel.scrollTop;
-                panel.scrollTop = panel.scrollHeight;
-                const jitterDelay = Math.floor(Math.random() * 150) + 150;
-                await new Promise((r) => setTimeout(r, jitterDelay));
+/**
+ * Backward-compatible alias for clearActiveSearchInput.
+ */
+export async function clearSearchBox(page: Page): Promise<void> {
+    await clearActiveSearchInput(page);
+}
+
+/**
+ * Switches WhatsApp Web navigation to the Chats tab if not already active.
+ */
+export async function navigateToChatsTab(page: Page): Promise<void> {
+    try {
+        const chatsListSel = getCombinedSelector(WHATSAPP_LOCATORS.chatListContainer);
+        const channelsListSel = getCombinedSelector(WHATSAPP_LOCATORS.channelsListContainer);
+
+        const isChatsView = await page.evaluate(({ chats, channels }) => {
+            const pane = document.querySelector(chats);
+            const channelsHeader = document.querySelector(channels);
+            return !!pane && !channelsHeader;
+        }, { chats: chatsListSel, channels: channelsListSel });
+
+        if (isChatsView) return;
+
+        const chatsTabSelectors = getLocatorSelectors(WHATSAPP_LOCATORS.chatsTabBtn);
+
+        for (const sel of chatsTabSelectors) {
+            const tab = page.locator(sel).first();
+            if ((await tab.count()) > 0 && (await tab.isVisible().catch(() => false))) {
+                await tab.click({ force: true }).catch(() => { });
+                await page.waitForTimeout(600);
+                break;
             }
-        }, maxScrollAttempts);
+        }
+    } catch {
+        // Non-fatal navigation issue
+    }
+}
+
+/**
+ * Switches WhatsApp Web navigation to the Channels / Updates sidebar rail view if not already active.
+ */
+export async function navigateToChannelsTab(page: Page): Promise<boolean> {
+    try {
+        const channelsListSel = getCombinedSelector(WHATSAPP_LOCATORS.channelsListContainer);
+
+        const isAlreadyChannels = await page.evaluate((selector) => {
+            return !!document.querySelector(selector);
+        }, channelsListSel);
+
+        if (isAlreadyChannels) return true;
+
+        const channelsTabSelectors = getLocatorSelectors(WHATSAPP_LOCATORS.channelsTabBtn);
+
+        for (const sel of channelsTabSelectors) {
+            const tab = page.locator(sel).first();
+            if ((await tab.count()) > 0 && (await tab.isVisible().catch(() => false))) {
+                await tab.click({ force: true }).catch(() => { });
+                await page.waitForTimeout(1000);
+                return true;
+            }
+        }
+
+        // Fallback check
+        return await page.evaluate((selector) => {
+            return !!document.querySelector(selector);
+        }, channelsListSel);
     } catch (err) {
-        console.warn("Scroll to bottom encountered a non-fatal issue:", err);
+        console.warn("Failed to navigate to Channels tab:", err);
+        return false;
     }
 }
 
 /**
  * Progressively scrolls and accumulates all messages matching the target extraction scope,
- * handling WhatsApp Web's virtual message DOM list seamlessly.
+ * handling WhatsApp Web's virtual message DOM list for both groups and channels.
  */
 export async function collectAllScopeMessages(
     page: Page,
@@ -89,7 +168,7 @@ export async function collectAllScopeMessages(
     const harvest = async () => {
         const raw = await evaluateConversationMessages(page);
         for (const msg of raw) {
-            const key = msg.prePlainText || msg.text.slice(0, 80);
+            const key = msg.prePlainText || (msg.rawLinks.length > 0 ? msg.rawLinks.join('|') : msg.text.slice(0, 100));
             if (key && !collected.has(key)) {
                 collected.set(key, msg);
             }
@@ -105,16 +184,19 @@ export async function collectAllScopeMessages(
 
     // 2. Progressive upward scroll
     const maxScrollSteps = scope === "unread" ? 10 : 25;
+    const panelSel = getCombinedSelector(WHATSAPP_LOCATORS.conversationPanelMessages);
 
     for (let step = 1; step <= maxScrollSteps; step++) {
-        const scrollInfo = await page.evaluate(async () => {
+        const scrollInfo = await page.evaluate(async (panelSelector) => {
             const main = document.querySelector('#main');
             if (!main) return { atTop: true, scrollTop: 0 };
 
             const panel = (
+                main.querySelector(panelSelector) ||
                 main.querySelector('[data-testid="conversation-panel-messages"]') ||
                 main.querySelector('.copyable-area [tabindex="0"]') ||
-                main.querySelector('.copyable-area')
+                main.querySelector('.copyable-area') ||
+                main
             ) as HTMLElement | null;
 
             if (!panel) return { atTop: true, scrollTop: 0 };
@@ -125,7 +207,7 @@ export async function collectAllScopeMessages(
                 atTop: panel.scrollTop === 0 && prevTop === 0,
                 scrollTop: panel.scrollTop,
             };
-        });
+        }, panelSel);
 
         await page.waitForTimeout(400); // allow virtual list to render previous DOM nodes
         await harvest();
@@ -135,12 +217,11 @@ export async function collectAllScopeMessages(
         }
 
         if (scope === "today") {
-            // Check if we reached messages from yesterday or older
             const hasYesterdayOrOlder = Array.from(collected.values()).some((m) => {
                 if (!m.prePlainText && !m.dateSection) return false;
                 return isDateYesterday(m.prePlainText) ||
-                       isDateYesterday(m.dateSection) ||
-                       (!isDateToday(m.prePlainText) && !isDateToday(m.dateSection) && (m.prePlainText.includes('/') || m.prePlainText.includes('-')));
+                    isDateYesterday(m.dateSection) ||
+                    (!isDateToday(m.prePlainText) && !isDateToday(m.dateSection) && (m.prePlainText.includes('/') || m.prePlainText.includes('-')));
             });
             if (hasYesterdayOrOlder) {
                 break;
@@ -148,14 +229,13 @@ export async function collectAllScopeMessages(
         }
 
         if (scope === "yesterday") {
-            // Check if we reached messages strictly older than yesterday
             const hasOlderThanYesterday = Array.from(collected.values()).some((m) => {
                 if (!m.prePlainText && !m.dateSection) return false;
                 return !isDateToday(m.prePlainText) &&
-                       !isDateToday(m.dateSection) &&
-                       !isDateYesterday(m.prePlainText) &&
-                       !isDateYesterday(m.dateSection) &&
-                       (m.prePlainText.includes('/') || m.prePlainText.includes('-') || /^(monday|tuesday|wednesday|thursday|friday|saturday|sunday)/i.test(m.dateSection));
+                    !isDateToday(m.dateSection) &&
+                    !isDateYesterday(m.prePlainText) &&
+                    !isDateYesterday(m.dateSection) &&
+                    (m.prePlainText.includes('/') || m.prePlainText.includes('-') || /^(monday|tuesday|wednesday|thursday|friday|saturday|sunday)/i.test(m.dateSection));
             });
             if (hasOlderThanYesterday) {
                 break;
@@ -171,7 +251,7 @@ export async function collectAllScopeMessages(
 }
 
 /**
- * Helper to escape special regex characters in group names.
+ * Helper to escape special regex characters.
  */
 function escapeRegex(str: string): string {
     return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -239,31 +319,27 @@ export function isDateYesterday(text: string): boolean {
 }
 
 /**
- * Cleans extracted URL to remove trailing punctuation or timestamp artifacts.
+ * Cleans extracted URL to remove trailing punctuation, bracket symbols, or timestamp artifacts.
  */
 export function cleanExtractedUrl(rawUrl: string): string {
     let url = rawUrl.trim();
-    // Remove trailing punctuation or brackets
     url = url.replace(/[.,;:!?)>"']+$/, '');
-    // Remove trailing timestamp artifacts like /10:01, /11:44, 10:01am
     url = url.replace(/\/\d{1,2}:\d{2}(:\d{2})?(am|pm)?$/i, '/');
     url = url.replace(/\d{1,2}:\d{2}(:\d{2})?(am|pm)?$/i, '');
     return url;
 }
 
 /**
- * Generates search candidate queries for a group (exact name, prefix without brackets or suffix keywords).
+ * Generates search candidate queries for a group or channel.
  */
-export function getSearchCandidates(groupName: string): string[] {
-    const candidates = [groupName];
+export function getSearchCandidates(name: string): string[] {
+    const candidates = [name];
 
-    // 1. Remove bracketed/parenthesized text
-    const noBrackets = groupName.replace(/\s*[\(\[\{].*?[\)\]\}]/g, '').trim();
+    const noBrackets = name.replace(/\s*[\(\[\{].*?[\)\]\}]/g, '').trim();
     if (noBrackets && !candidates.includes(noBrackets)) {
         candidates.push(noBrackets);
     }
 
-    // 2. Remove trailing suffix keywords like Jobs, Alerts, Updates, Group, Openings, numbers, hyphens
     const noSuffix = noBrackets
         .replace(/\s*[-–]\s*\d+.*$/, '')
         .replace(/\s+(jobs|alerts|updates|group|openings|batch|community)\b.*$/i, '')
@@ -281,44 +357,6 @@ export interface SearchAndOpenResult {
 }
 
 /**
- * Clears the WhatsApp Web search input box and resets the chat list view.
- */
-export async function clearSearchBox(page: Page): Promise<void> {
-    try {
-        const clearBtn = page
-            .locator(
-                '#side [data-testid="chat-list-search-container"] button, #side button[aria-label="End icon button"], #side button[aria-label="Cancel search"], #side [data-testid="search-cancel-btn"]'
-            )
-            .first();
-
-        if ((await clearBtn.count()) > 0 && (await clearBtn.isVisible())) {
-            await clearBtn.click({ force: true }).catch(() => {});
-            await page.waitForTimeout(100);
-        }
-
-        await page.evaluate(() => {
-            const input = document.querySelector(
-                '#side div[data-testid="chat-list-search-container"] [contenteditable="true"], #side div[data-testid="chat-list-search-container"] input, #side [data-tab="3"], #side [role="textbox"]'
-            ) as HTMLElement;
-            if (input) {
-                if ('value' in input) {
-                    (input as HTMLInputElement).value = '';
-                } else {
-                    input.textContent = '';
-                }
-                input.dispatchEvent(new Event('input', { bubbles: true }));
-                input.dispatchEvent(new Event('change', { bubbles: true }));
-            }
-        });
-
-        await page.keyboard.press("Escape").catch(() => {});
-        await page.waitForTimeout(100);
-    } catch {
-        // ignore
-    }
-}
-
-/**
  * Searches for a group using the WhatsApp Web search input, extracts unread badge count from search results,
  * and opens the chat if appropriate.
  */
@@ -328,60 +366,60 @@ export async function searchAndOpenGroup(
     scope?: ExtractionScope
 ): Promise<SearchAndOpenResult> {
     try {
+        await clearActiveSearchInput(page);
+
         // 0. Check if group is already open in active conversation header (inside #main ONLY)
-        const alreadyOpen = await page.evaluate((targetName) => {
-            const header = document.querySelector(
-                '#main [data-testid="conversation-info-header-chat-title"], #main [data-testid="conversation-header"] h2'
-            );
+        const headerTitleSel = getCombinedSelector(WHATSAPP_LOCATORS.conversationChatTitle);
+        const headerContainerSel = getCombinedSelector(WHATSAPP_LOCATORS.conversationHeader);
+
+        const alreadyOpen = await page.evaluate(({ targetName, titleSel, headerSel }) => {
+            const header = document.querySelector(titleSel) || document.querySelector(headerSel);
             const text = header?.textContent?.trim() || "";
             if (!text) return false;
             const h = text.toLowerCase();
             const t = targetName.toLowerCase().trim();
             const prefix = t.replace(/\s*[-–(].*$/, '').trim();
             return h === t || h.includes(t) || t.includes(h) || (prefix.length >= 3 && h.includes(prefix));
-        }, groupName);
+        }, { targetName: groupName, titleSel: headerTitleSel, headerSel: headerContainerSel });
 
         if (alreadyOpen && scope !== "unread") {
             return { status: "opened", unreadCount: 0 };
         }
 
         // 1. Locate search box strictly inside #side
-        const searchBox = page
-            .locator(
-                '#side div[data-testid="chat-list-search-container"] [contenteditable="true"], #side div[data-testid="chat-list-search-container"] input, #side [data-tab="3"], #side [data-testid="chat-list-search"], #side [role="textbox"]'
-            )
-            .first();
+        const searchInputSel = getCombinedSelector(WHATSAPP_LOCATORS.chatListSearchInput);
+        const searchBox = page.locator(searchInputSel).first();
 
         await searchBox.waitFor({ state: "visible", timeout: 8000 });
 
-        // Search terms to try in priority order
         const searchTerms = getSearchCandidates(groupName);
 
         for (const searchTerm of searchTerms) {
-            // 2. Click and clear search box
             await searchBox.click({ force: true });
             await page.waitForTimeout(100);
-
-            await clearSearchBox(page);
+            await clearActiveSearchInput(page);
             await page.waitForTimeout(100);
 
-            // 3. Type search term using keyboard with randomized human-like keystroke intervals
-            const charDelay = Math.floor(Math.random() * 35) + 35; // 35ms - 70ms per character
+            const charDelay = Math.floor(Math.random() * 35) + 35;
             await page.keyboard.type(searchTerm, { delay: charDelay });
             await randomJitter(800, 1500);
 
-            // 4. Inspect search results for matching row & unread badge
-            const matchInfo = await page.evaluate((targetName) => {
-                const pane = document.querySelector('#pane-side, [data-testid="chat-list"], [aria-label="Search results."]');
+            const paneSel = getCombinedSelector(WHATSAPP_LOCATORS.chatListContainer);
+            const rowSel = getCombinedSelector(WHATSAPP_LOCATORS.chatListRow);
+            const titleSpanSel = getCombinedSelector(WHATSAPP_LOCATORS.chatRowTitle);
+            const unreadBadgeSel = getCombinedSelector(WHATSAPP_LOCATORS.chatRowUnreadBadge);
+
+            const matchInfo = await page.evaluate(({ targetName, paneSelector, rowSelector, titleSelector, badgeSelector }) => {
+                const pane = document.querySelector(paneSelector);
                 if (!pane) return null;
 
                 const lowerTarget = targetName.toLowerCase().trim();
                 const prefix = lowerTarget.replace(/\s*[-–(].*$/, '').trim();
-                const rows = Array.from(pane.querySelectorAll('[role="row"], [data-testid^="list-item-"]'));
+                const rows = Array.from(pane.querySelectorAll(rowSelector));
 
                 for (const [i, row] of rows.entries()) {
                     if (!row) continue;
-                    const titleSpan = row.querySelector('[data-testid="cell-frame-title"] span, span[title]');
+                    const titleSpan = row.querySelector(titleSelector);
                     const title = (titleSpan?.getAttribute('title') || row.textContent || '').toLowerCase().trim();
 
                     if (
@@ -391,9 +429,7 @@ export async function searchAndOpenGroup(
                         (prefix.length >= 3 && title.includes(prefix))
                     ) {
                         let count = 0;
-                        const unreadEl = row.querySelector(
-                            '[data-testid="icon-unread-count"], span[role="status"], span.x140p0ai'
-                        );
+                        const unreadEl = row.querySelector(badgeSelector);
                         if (unreadEl) {
                             const label = unreadEl.getAttribute('aria-label') || unreadEl.textContent || '';
                             const match = label.match(/\d+/);
@@ -403,50 +439,48 @@ export async function searchAndOpenGroup(
                     }
                 }
                 return null;
-            }, groupName);
+            }, {
+                targetName: groupName,
+                paneSelector: paneSel,
+                rowSelector: rowSel,
+                titleSelector: titleSpanSel,
+                badgeSelector: unreadBadgeSel,
+            });
 
-            // If no match found under this candidate term, try the next candidate
             if (!matchInfo) {
                 continue;
             }
 
-            // If in unread scope and unread count is 0, skip opening and return
             if (scope === "unread" && matchInfo.unreadCount === 0) {
-                await clearSearchBox(page);
+                await clearActiveSearchInput(page);
                 return { status: "skipped_no_unread", unreadCount: 0 };
             }
 
-            // 5. Try opening the chat:
             const escaped = escapeRegex(searchTerm);
             const chatRowLocator = page
-                .locator('#pane-side [role="row"], [data-testid="chat-list"] [role="row"], [aria-label="Search results."] [role="row"]')
-                .filter({ has: page.locator(`[data-testid="cell-frame-title"], span[title]`).filter({ hasText: new RegExp(escaped, 'i') }) })
+                .locator(rowSel)
+                .filter({ has: page.locator(titleSpanSel).filter({ hasText: new RegExp(escaped, 'i') }) })
                 .first();
 
             if ((await chatRowLocator.count()) > 0) {
-                await chatRowLocator.click({ force: true }).catch(() => {});
+                await chatRowLocator.click({ force: true }).catch(() => { });
             } else {
-                const rowLocator = page
-                    .locator('#pane-side [role="row"], [data-testid="chat-list"] [role="row"], [aria-label="Search results."] [role="row"]')
-                    .nth(matchInfo.rowIndex);
+                const rowLocator = page.locator(rowSel).nth(matchInfo.rowIndex);
                 if ((await rowLocator.count()) > 0) {
-                    await rowLocator.click({ force: true }).catch(() => {});
+                    await rowLocator.click({ force: true }).catch(() => { });
                 } else {
                     await page.keyboard.press("Enter");
                 }
             }
 
-            // 6. Wait for conversation panel to be visible inside #main
-            await page.waitForSelector('#main [data-testid="conversation-panel-messages"], #main .copyable-area, #main', {
+            const conversationPanelSel = getCombinedSelector(WHATSAPP_LOCATORS.conversationPanelMessages);
+            await page.waitForSelector(conversationPanelSel, {
                 state: "visible",
                 timeout: 6000,
-            }).catch(() => {});
+            }).catch(() => { });
 
-            // 7. Verify if conversation is opened with the target group title
-            const isNowOpen = await page.evaluate((targetName) => {
-                const header = document.querySelector(
-                    '#main [data-testid="conversation-info-header-chat-title"], #main [data-testid="conversation-header"]'
-                );
+            const isNowOpen = await page.evaluate(({ targetName, titleSelector, headerSelector }) => {
+                const header = document.querySelector(titleSelector) || document.querySelector(headerSelector);
                 const text = header?.textContent?.trim() || "";
                 if (!text) {
                     return !!document.querySelector('#main');
@@ -455,76 +489,165 @@ export async function searchAndOpenGroup(
                 const t = targetName.toLowerCase().trim();
                 const prefix = t.replace(/\s*[-–(].*$/, '').trim();
                 return h.includes(prefix) || prefix.includes(h) || h === t || h.includes(t) || t.includes(h);
-            }, groupName);
+            }, { targetName: groupName, titleSelector: headerTitleSel, headerSelector: headerContainerSel });
 
             if (isNowOpen) {
-                // Focus conversation pane on the right so keyboard/wheel events target #main
-                await page.locator('#main header, #main [data-testid="conversation-header"]').first().click({ force: true }).catch(() => {});
-                await page.hover('#main [data-testid="conversation-panel-messages"], #main').catch(() => {});
+                await page.locator(headerContainerSel).first().click({ force: true }).catch(() => { });
+                await page.hover(conversationPanelSel).catch(() => { });
                 await randomJitter(300, 600);
                 return { status: "opened", unreadCount: matchInfo.unreadCount };
             }
         }
 
-        // If not found after checking all search terms
-        await clearSearchBox(page);
+        await clearActiveSearchInput(page);
         console.warn(`Group '${groupName}' could not be found or opened from search results.`);
         return { status: "not_found", unreadCount: 0 };
     } catch (error) {
         console.warn(`Failed to search and open group '${groupName}':`, error);
-        await clearSearchBox(page);
+        await clearActiveSearchInput(page);
         return { status: "not_found", unreadCount: 0 };
     }
 }
 
 /**
- * Extracts unread message count from group row in chat list.
+ * Locates and opens a target followed WhatsApp Channel in the Channels sidebar view.
  */
-export async function getGroupUnreadCount(page: Page, groupName: string): Promise<number> {
+export async function openFollowedChannel(
+    page: Page,
+    channelName: string,
+    scope?: ExtractionScope
+): Promise<SearchAndOpenResult> {
     try {
-        return await page.evaluate((name) => {
-            const pane = document.querySelector('#pane-side, [data-testid="chat-list"]');
-            if (!pane) return 0;
+        await clearActiveSearchInput(page);
 
-            const lowerTarget = name.toLowerCase().trim();
-            const rows = Array.from(pane.querySelectorAll('[role="row"], [data-testid^="list-item-"]'));
+        // 0. Check if channel is already active in #main
+        const channelChatTitleSel = getCombinedSelector(WHATSAPP_LOCATORS.channelChatTitle);
+        const channelHeaderSel = getCombinedSelector(WHATSAPP_LOCATORS.channelHeader);
 
-            for (const row of rows) {
-                const titleSpan = row.querySelector('[data-testid="cell-frame-title"] span, span[title]');
-                const title = (titleSpan?.getAttribute('title') || row.textContent || '').toLowerCase().trim();
+        const alreadyOpen = await page.evaluate(({ targetName, titleSel, headerSel }) => {
+            const header = document.querySelector(titleSel) || document.querySelector(headerSel);
+            const text = header?.textContent?.trim() || "";
+            if (!text) return false;
+            const h = text.toLowerCase();
+            const t = targetName.toLowerCase().trim();
+            const prefix = t.replace(/\s*[-–(].*$/, '').trim();
+            return h === t || h.includes(t) || t.includes(h) || (prefix.length >= 3 && h.includes(prefix));
+        }, { targetName: channelName, titleSel: channelChatTitleSel, headerSel: channelHeaderSel });
 
-                if (title.includes(lowerTarget)) {
-                    const unreadEl = row.querySelector('[data-testid="icon-unread-count"], span[role="status"], span.x140p0ai');
+        if (alreadyOpen && scope !== "unread") {
+            return { status: "opened", unreadCount: 0 };
+        }
+
+        // 1. Scan channel list rows in Channels view
+        const channelRowSel = getCombinedSelector(WHATSAPP_LOCATORS.channelListRow);
+        const channelTitleSel = getCombinedSelector(WHATSAPP_LOCATORS.channelRowTitle);
+        const channelBadgeSel = getCombinedSelector(WHATSAPP_LOCATORS.channelRowUnreadBadge);
+
+        const matchInfo = await page.evaluate(({ targetName, rowSelector, titleSelector, badgeSelector }) => {
+            const rows = Array.from(document.querySelectorAll(rowSelector));
+            const lowerTarget = targetName.toLowerCase().trim();
+            const prefix = lowerTarget.replace(/\s*[-–(].*$/, '').trim();
+
+            for (const [i, row] of rows.entries()) {
+                const titleSpan = row.querySelector(titleSelector);
+                const title = (titleSpan?.getAttribute('title') || titleSpan?.textContent || row.textContent || '').toLowerCase().trim();
+
+                if (
+                    title === lowerTarget ||
+                    title.includes(lowerTarget) ||
+                    lowerTarget.includes(title) ||
+                    (prefix.length >= 3 && title.includes(prefix))
+                ) {
+                    let count = 0;
+                    const unreadEl = row.querySelector(badgeSelector);
                     if (unreadEl) {
                         const label = unreadEl.getAttribute('aria-label') || unreadEl.textContent || '';
                         const match = label.match(/\d+/);
-                        if (match) return parseInt(match[0], 10);
+                        if (match) count = parseInt(match[0], 10);
                     }
+                    return { rowIndex: i, unreadCount: count, foundText: title };
                 }
             }
-            return 0;
-        }, groupName);
-    } catch {
-        return 0;
+            return null;
+        }, {
+            targetName: channelName,
+            rowSelector: channelRowSel,
+            titleSelector: channelTitleSel,
+            badgeSelector: channelBadgeSel,
+        });
+
+        if (matchInfo) {
+            if (scope === "unread" && matchInfo.unreadCount === 0) {
+                return { status: "skipped_no_unread", unreadCount: 0 };
+            }
+
+            const items = page.locator(channelRowSel);
+            if ((await items.count()) > matchInfo.rowIndex) {
+                await items.nth(matchInfo.rowIndex).click({ force: true }).catch(() => { });
+            }
+
+            const messageContainerSel = getCombinedSelector(WHATSAPP_LOCATORS.channelMessageContainer);
+            await page.waitForSelector(messageContainerSel, {
+                state: "visible",
+                timeout: 8000,
+            }).catch(() => { });
+
+            await page.locator(channelHeaderSel).first().click({ force: true }).catch(() => { });
+            await page.hover('#main').catch(() => { });
+            await randomJitter(300, 600);
+
+            return { status: "opened", unreadCount: matchInfo.unreadCount };
+        }
+
+        // 2. Filter search inside Channels view
+        const channelsSearchInputSel = getCombinedSelector(WHATSAPP_LOCATORS.channelsSearchInput);
+        const channelSearchInput = page.locator(channelsSearchInputSel).first();
+
+        if ((await channelSearchInput.count()) > 0 && (await channelSearchInput.isVisible().catch(() => false))) {
+            await channelSearchInput.click({ force: true });
+            await clearActiveSearchInput(page);
+            await channelSearchInput.fill(channelName);
+            await page.waitForTimeout(1000);
+
+            const filteredItem = page.locator(channelRowSel).first();
+
+            if ((await filteredItem.count()) > 0 && (await filteredItem.isVisible().catch(() => false))) {
+                await filteredItem.click({ force: true }).catch(() => { });
+                await page.waitForTimeout(2000);
+                await clearActiveSearchInput(page);
+                return { status: "opened", unreadCount: 0 };
+            }
+            await clearActiveSearchInput(page);
+        }
+
+        console.warn(`Followed channel '${channelName}' could not be located in Channels view.`);
+        return { status: "not_found", unreadCount: 0 };
+    } catch (err) {
+        console.warn(`Failed to open channel '${channelName}':`, err);
+        await clearActiveSearchInput(page);
+        return { status: "not_found", unreadCount: 0 };
     }
 }
 
 /**
  * Checks if a given hyperlink matches the target domain or any allowed domain aliases.
  */
-export function isMatchingDomain(href: string, group: WhatsAppGroupConfig): boolean {
+export function isMatchingDomain(
+    href: string,
+    source: { targetDomain: string; allowedDomains?: string[] | undefined }
+): boolean {
     if (!href) return false;
     try {
         const urlObj = new URL(href);
         const hostname = urlObj.hostname.toLowerCase().replace(/^www\./, "");
-        const target = group.targetDomain.toLowerCase().replace(/^www\./, "");
+        const target = source.targetDomain.toLowerCase().replace(/^www\./, "");
 
         if (hostname === target || hostname.endsWith(`.${target}`) || target.endsWith(`.${hostname}`)) {
             return true;
         }
 
-        if (group.allowedDomains && group.allowedDomains.length > 0) {
-            return group.allowedDomains.some((d) => {
+        if (source.allowedDomains && source.allowedDomains.length > 0) {
+            return source.allowedDomains.some((d) => {
                 const normD = d.toLowerCase().replace(/^www\./, "");
                 return hostname === normD || hostname.endsWith(`.${normD}`) || normD.endsWith(`.${hostname}`);
             });
@@ -547,10 +670,14 @@ export interface RawMessageData {
 }
 
 /**
- * Evaluates messages and date dividers in the active conversation panel.
+ * Evaluates messages, broadcast posts, and date dividers in the active conversation panel.
  */
 export async function evaluateConversationMessages(page: Page): Promise<RawMessageData[]> {
-    return await page.evaluate(() => {
+    const msgContainerSel = getCombinedSelector(WHATSAPP_LOCATORS.messageContainer);
+    const dateDividerSel = getCombinedSelector(WHATSAPP_LOCATORS.dateDividerSpan);
+    const linkSel = getCombinedSelector(WHATSAPP_LOCATORS.messageAnchorLink);
+
+    return await page.evaluate(({ msgContainerSelector, dateDividerSelector, linkSelector }) => {
         const urlRegex = /https?:\/\/[^\s<>"'{}|\\^`]+/gi;
         const results: {
             rawLinks: string[];
@@ -559,7 +686,6 @@ export async function evaluateConversationMessages(page: Page): Promise<RawMessa
             dateSection: string;
         }[] = [];
 
-        // Try multiple selectors for the active conversation container
         const main =
             document.querySelector('#main') ||
             document.querySelector('[data-testid="conversation-panel-wrapper"]') ||
@@ -567,8 +693,8 @@ export async function evaluateConversationMessages(page: Page): Promise<RawMessa
             document.querySelector('.copyable-area') ||
             document.body;
 
-        // 1. Find all date divider headers in the conversation
-        const allSpans = Array.from(main.querySelectorAll("div[tabindex='-1'] span[dir='auto'], span[dir='auto']"));
+        // 1. Find all date divider headers
+        const allSpans = Array.from(main.querySelectorAll(dateDividerSelector));
         const dateHeaders: { el: Element; text: string }[] = [];
 
         for (const s of allSpans) {
@@ -578,21 +704,16 @@ export async function evaluateConversationMessages(page: Page): Promise<RawMessa
                 !t.includes(':') &&
                 t.length < 35 &&
                 (/^(today|yesterday|monday|tuesday|wednesday|thursday|friday|saturday|sunday)/i.test(t) ||
-                 /\b\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}\b/.test(t) ||
-                 /\b(january|february|march|april|may|june|july|august|september|october|november|december)\b/i.test(t))
+                    /\b\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}\b/.test(t) ||
+                    /\b(january|february|march|april|may|june|july|august|september|october|november|december)\b/i.test(t))
             ) {
                 dateHeaders.push({ el: s, text: t });
             }
         }
 
-        // 2. Find all message elements
-        const messageElements = Array.from(
-            main.querySelectorAll(
-                'div[data-testid="msg-container"], div[data-testid^="conv-msg-"], div.copyable-text, [data-testid="selectable-text"]'
-            )
-        );
+        // 2. Find all message elements (groups and channels)
+        const messageElements = Array.from(main.querySelectorAll(msgContainerSelector));
 
-        // Deduplicate messages by data-pre-plain-text or text
         const uniqueMessages: HTMLElement[] = [];
         const seenKeys = new Set<string>();
 
@@ -613,7 +734,6 @@ export async function evaluateConversationMessages(page: Page): Promise<RawMessa
             const prePlainText = msg.getAttribute('data-pre-plain-text') || msg.closest('[data-pre-plain-text]')?.getAttribute('data-pre-plain-text') || '';
             const text = msg.textContent || '';
 
-            // Find the most recent date header appearing before this message in DOM order
             let dateSection = '';
             for (const header of dateHeaders) {
                 if (header.el.compareDocumentPosition(msg) & Node.DOCUMENT_POSITION_FOLLOWING) {
@@ -622,10 +742,8 @@ export async function evaluateConversationMessages(page: Page): Promise<RawMessa
             }
 
             const linkSet = new Set<string>();
-
-            // Direct <a> tags inside or in parent msg-container
-            const msgParent = msg.closest('[data-testid="msg-container"]') || msg;
-            const anchors = msgParent.querySelectorAll('a[href]');
+            const msgParent = msg.closest('[data-testid="msg-container"]') || msg.closest('div[role="row"]') || msg;
+            const anchors = msgParent.querySelectorAll(linkSelector);
             anchors.forEach((a) => {
                 const href = a.getAttribute('href');
                 if (href && (href.startsWith('http://') || href.startsWith('https://'))) {
@@ -633,7 +751,6 @@ export async function evaluateConversationMessages(page: Page): Promise<RawMessa
                 }
             });
 
-            // Plain text URLs
             const matches = text.match(urlRegex);
             if (matches) {
                 matches.forEach((url) => linkSet.add(url.trim()));
@@ -664,25 +781,119 @@ export async function evaluateConversationMessages(page: Page): Promise<RawMessa
         }
 
         return results;
+    }, {
+        msgContainerSelector: msgContainerSel,
+        dateDividerSelector: dateDividerSel,
+        linkSelector: linkSel,
     });
 }
 
+/**
+ * Extracts hyperlinks from a WhatsApp Channel broadcast feed, applying domain whitelisting and scope boundaries.
+ */
+export async function extractChannelBroadcastLinks(
+    page: Page,
+    channelConfig: WhatsAppSourceConfig | WhatsAppChannelConfig,
+    scope: ExtractionScope,
+    unreadCount = 0
+): Promise<{ links: string[]; renderedCount: number; processedCount: number }> {
+    const rawMessages = await collectAllScopeMessages(page, scope, unreadCount);
+    const renderedCount = rawMessages.length;
+    const channelLinks: string[] = [];
+    let processedCount = 0;
 
+    const targetDomain = 'targetDomain' in channelConfig ? channelConfig.targetDomain : '';
+    const allowedDomains = channelConfig.allowedDomains || [targetDomain];
+
+    if (scope === "unread") {
+        const startIndex = unreadCount > 0 ? Math.max(0, renderedCount - unreadCount) : 0;
+        processedCount = renderedCount - startIndex;
+
+        for (let i = startIndex; i < renderedCount; i++) {
+            const msg = rawMessages[i];
+            if (msg) {
+                for (const rawLink of msg.rawLinks) {
+                    const link = cleanExtractedUrl(rawLink);
+                    if (isMatchingDomain(link, { targetDomain, allowedDomains })) {
+                        channelLinks.push(link);
+                    }
+                }
+            }
+        }
+    } else if (scope === "today") {
+        for (const msg of rawMessages) {
+            const isToday =
+                isDateToday(msg.dateSection) ||
+                isDateToday(msg.prePlainText) ||
+                (!msg.dateSection && !isDateYesterday(msg.prePlainText) && !msg.prePlainText.includes('/'));
+
+            if (isToday) {
+                processedCount++;
+                for (const rawLink of msg.rawLinks) {
+                    const link = cleanExtractedUrl(rawLink);
+                    if (isMatchingDomain(link, { targetDomain, allowedDomains })) {
+                        channelLinks.push(link);
+                    }
+                }
+            }
+        }
+    } else if (scope === "yesterday") {
+        for (const msg of rawMessages) {
+            const isYesterday =
+                isDateYesterday(msg.dateSection) ||
+                isDateYesterday(msg.prePlainText);
+
+            if (isYesterday) {
+                processedCount++;
+                for (const rawLink of msg.rawLinks) {
+                    const link = cleanExtractedUrl(rawLink);
+                    if (isMatchingDomain(link, { targetDomain, allowedDomains })) {
+                        channelLinks.push(link);
+                    }
+                }
+            }
+        }
+    }
+
+    return {
+        links: Array.from(new Set(channelLinks)),
+        renderedCount,
+        processedCount,
+    };
+}
 
 /**
- * Core scraping workflow for WhatsApp groups.
+ * Core scraping workflow for WhatsApp groups and broadcast channels.
  */
-export async function scrapeWhatsAppLinks(
+export async function scrapeWhatsAppJobLinks(
     options: WhatsAppScrapeOptions,
     onEvent?: WhatsAppEventCallback
 ): Promise<WhatsAppImportResult> {
     const startTime = Date.now();
     const startedAt = new Date().toISOString();
-    const groupsToScrape: WhatsAppGroupConfig[] =
-        options.groups || DEFAULT_WHATSAPP_GROUPS.filter((g) => g.enabled !== false);
     const scope = options.scope || "unread";
 
-    const emit = (event: Parameters<NonNullable<typeof onEvent>>[0]) => {
+    // Resolve sources to scrape: priority to unified `sources`, fallback to legacy `groups`, or DEFAULT_WHATSAPP_SOURCES
+    let sourcesToScrape: WhatsAppSourceConfig[];
+
+    if (options.sources && options.sources.length > 0) {
+        sourcesToScrape = options.sources.filter((s) => s.enabled !== false);
+    } else if (options.groups && options.groups.length > 0) {
+        sourcesToScrape = options.groups.filter((g) => g.enabled !== false).map((g) => ({
+            type: 'group' as const,
+            name: g.groupName,
+            targetDomain: g.targetDomain,
+            allowedDomains: g.allowedDomains,
+            enabled: g.enabled,
+        }));
+    } else {
+        sourcesToScrape = DEFAULT_WHATSAPP_SOURCES.filter((s) => s.enabled !== false);
+    }
+
+    const totalGroups = sourcesToScrape.filter((s) => s.type === 'group').length;
+    const totalChannels = sourcesToScrape.filter((s) => s.type === 'channel').length;
+
+    const emit = (event: WhatsAppSSEEvent) => {
         if (onEvent) {
             onEvent(event);
         }
@@ -700,10 +911,12 @@ export async function scrapeWhatsAppLinks(
     });
 
     const allJobLinks = new Set<string>();
-    const groupResults: GroupScrapeResult[] = [];
+    const sourceResults: SourceScrapeResult[] = [];
+    let processedSources = 0;
     let processedGroups = 0;
-    let skippedGroups = 0;
-    let failedGroups = 0;
+    let processedChannels = 0;
+    let skippedSources = 0;
+    let failedSources = 0;
 
     try {
         emit({
@@ -744,13 +957,13 @@ export async function scrapeWhatsAppLinks(
 
         emit({
             type: "status",
-            message: `Starting extraction for ${groupsToScrape.length} group(s) with scope '${scope}'...`,
+            message: `Starting extraction for ${sourcesToScrape.length} source(s) (${totalGroups} group(s), ${totalChannels} channel(s)) with scope '${scope}'...`,
             timestamp: new Date().toISOString(),
         });
 
-        // 2. Iterate through configured groups
+        // 2. Iterate through configured sources
         let currentIndex = 0;
-        for (const group of groupsToScrape) {
+        for (const source of sourcesToScrape) {
             if (options.signal?.aborted) {
                 console.log("Extraction aborted by client signal.");
                 break;
@@ -758,194 +971,356 @@ export async function scrapeWhatsAppLinks(
 
             currentIndex++;
 
+            // Emit unified source_start and backward-compatible group_start
             emit({
-                type: "group_start",
-                groupName: group.groupName,
-                targetDomain: group.targetDomain,
+                type: "source_start",
+                sourceType: source.type,
+                sourceName: source.name,
+                targetDomain: source.targetDomain,
                 index: currentIndex,
-                total: groupsToScrape.length,
+                total: sourcesToScrape.length,
             });
 
+            if (source.type === "group") {
+                emit({
+                    type: "group_start",
+                    groupName: source.name,
+                    targetDomain: source.targetDomain,
+                    index: currentIndex,
+                    total: sourcesToScrape.length,
+                });
+            }
+
             try {
-                // Search and open group (extracts unread badge during search)
-                emit({
-                    type: "group_progress",
-                    groupName: group.groupName,
-                    message: `Searching for group '${group.groupName}'...`,
-                });
+                if (source.type === "group") {
+                    // Ensure Chats tab is active
+                    await navigateToChatsTab(page);
 
-                const searchResult = await searchAndOpenGroup(page, group.groupName, scope);
-
-                if (searchResult.status === "skipped_no_unread") {
-                    const skipResult: GroupScrapeResult = {
-                        groupName: group.groupName,
-                        targetDomain: group.targetDomain,
-                        status: "skipped",
-                        unreadCount: 0,
-                        extractedLinks: [],
-                        warning: "No unread messages detected",
-                    };
-                    groupResults.push(skipResult);
-                    skippedGroups++;
                     emit({
-                        type: "group_complete",
-                        groupName: group.groupName,
-                        result: skipResult,
+                        type: "source_progress",
+                        sourceType: "group",
+                        sourceName: source.name,
+                        message: `Searching for group '${source.name}'...`,
                     });
-                    continue;
-                }
-
-                if (searchResult.status === "not_found") {
-                    const notFoundResult: GroupScrapeResult = {
-                        groupName: group.groupName,
-                        targetDomain: group.targetDomain,
-                        status: "warning",
-                        extractedLinks: [],
-                        warning: `Group '${group.groupName}' not found in search results`,
-                    };
-                    groupResults.push(notFoundResult);
-                    failedGroups++;
                     emit({
-                        type: "group_complete",
-                        groupName: group.groupName,
-                        result: notFoundResult,
+                        type: "group_progress",
+                        groupName: source.name,
+                        message: `Searching for group '${source.name}'...`,
                     });
-                    continue;
-                }
 
-                const unreadCount = searchResult.unreadCount;
+                    const searchResult = await searchAndOpenGroup(page, source.name, scope);
 
-                // Wait for message elements to mount in conversation panel
-                await page.waitForSelector(
-                    '#main [data-testid^="conv-msg-"], #main [data-testid="msg-container"], #main .copyable-text, #main [role="row"]',
-                    { state: "attached", timeout: 5000 }
-                ).catch(() => {});
-                await page.waitForTimeout(500);
+                    if (searchResult.status === "skipped_no_unread") {
+                        const skipResult: SourceScrapeResult = {
+                            sourceName: source.name,
+                            sourceType: "group",
+                            targetDomain: source.targetDomain,
+                            status: "skipped",
+                            unreadCount: 0,
+                            extractedLinks: [],
+                            warning: "No unread messages detected",
+                        };
+                        sourceResults.push(skipResult);
+                        skippedSources++;
+                        emit({
+                            type: "source_complete",
+                            sourceType: "group",
+                            sourceName: source.name,
+                            result: skipResult,
+                        });
+                        emit({
+                            type: "group_complete",
+                            groupName: source.name,
+                            result: { ...skipResult, groupName: source.name },
+                        });
+                        continue;
+                    }
 
-                emit({
-                    type: "group_progress",
-                    groupName: group.groupName,
-                    message: "Harvesting messages across scope history...",
-                    unreadCount: scope === "unread" ? unreadCount : undefined,
-                });
+                    if (searchResult.status === "not_found") {
+                        const notFoundResult: SourceScrapeResult = {
+                            sourceName: source.name,
+                            sourceType: "group",
+                            targetDomain: source.targetDomain,
+                            status: "warning",
+                            extractedLinks: [],
+                            warning: `Group '${source.name}' not found in search results`,
+                        };
+                        sourceResults.push(notFoundResult);
+                        failedSources++;
+                        emit({
+                            type: "source_complete",
+                            sourceType: "group",
+                            sourceName: source.name,
+                            result: notFoundResult,
+                        });
+                        emit({
+                            type: "group_complete",
+                            groupName: source.name,
+                            result: { ...notFoundResult, groupName: source.name },
+                        });
+                        continue;
+                    }
 
-                // Progressively collect all messages within scope from virtualized message pane
-                const rawMessages = await collectAllScopeMessages(page, scope, unreadCount);
-                const renderedCount = rawMessages.length;
+                    const unreadCount = searchResult.unreadCount;
 
-                if (renderedCount === 0) {
-                    const noMessagesResult: GroupScrapeResult = {
-                        groupName: group.groupName,
-                        targetDomain: group.targetDomain,
-                        status: "warning",
-                        messagesRendered: 0,
-                        extractedLinks: [],
-                        warning: "No messages rendered in conversation panel",
-                    };
-                    groupResults.push(noMessagesResult);
-                    failedGroups++;
+                    const msgRowSel = getCombinedSelector(WHATSAPP_LOCATORS.messageContainer);
+                    await page.waitForSelector(msgRowSel, { state: "attached", timeout: 5000 }).catch(() => { });
+                    await page.waitForTimeout(500);
+
                     emit({
-                        type: "group_complete",
-                        groupName: group.groupName,
-                        result: noMessagesResult,
+                        type: "source_progress",
+                        sourceType: "group",
+                        sourceName: source.name,
+                        message: "Harvesting messages across scope history...",
+                        unreadCount: scope === "unread" ? unreadCount : undefined,
                     });
-                    continue;
-                }
+                    emit({
+                        type: "group_progress",
+                        groupName: source.name,
+                        message: "Harvesting messages across scope history...",
+                        unreadCount: scope === "unread" ? unreadCount : undefined,
+                    });
 
-                const groupLinks: string[] = [];
-                let messagesProcessed = 0;
+                    const rawMessages = await collectAllScopeMessages(page, scope, unreadCount);
+                    const renderedCount = rawMessages.length;
 
-                if (scope === "unread") {
-                    const startIndex = unreadCount > 0 ? Math.max(0, renderedCount - unreadCount) : 0;
-                    messagesProcessed = renderedCount - startIndex;
+                    if (renderedCount === 0) {
+                        const noMessagesResult: SourceScrapeResult = {
+                            sourceName: source.name,
+                            sourceType: "group",
+                            targetDomain: source.targetDomain,
+                            status: "warning",
+                            messagesRendered: 0,
+                            extractedLinks: [],
+                            warning: "No messages rendered in conversation panel",
+                        };
+                        sourceResults.push(noMessagesResult);
+                        failedSources++;
+                        emit({
+                            type: "source_complete",
+                            sourceType: "group",
+                            sourceName: source.name,
+                            result: noMessagesResult,
+                        });
+                        emit({
+                            type: "group_complete",
+                            groupName: source.name,
+                            result: { ...noMessagesResult, groupName: source.name },
+                        });
+                        continue;
+                    }
 
-                    for (let i = startIndex; i < renderedCount; i++) {
-                        const msg = rawMessages[i];
-                        if (msg) {
-                            for (const rawLink of msg.rawLinks) {
-                                const link = cleanExtractedUrl(rawLink);
-                                if (isMatchingDomain(link, group)) {
-                                    groupLinks.push(link);
-                                    allJobLinks.add(link);
+                    const groupLinks: string[] = [];
+                    let messagesProcessed = 0;
+
+                    if (scope === "unread") {
+                        const startIndex = unreadCount > 0 ? Math.max(0, renderedCount - unreadCount) : 0;
+                        messagesProcessed = renderedCount - startIndex;
+
+                        for (let i = startIndex; i < renderedCount; i++) {
+                            const msg = rawMessages[i];
+                            if (msg) {
+                                for (const rawLink of msg.rawLinks) {
+                                    const link = cleanExtractedUrl(rawLink);
+                                    if (isMatchingDomain(link, source)) {
+                                        groupLinks.push(link);
+                                        allJobLinks.add(link);
+                                    }
+                                }
+                            }
+                        }
+                    } else if (scope === "today") {
+                        for (const msg of rawMessages) {
+                            const isToday =
+                                isDateToday(msg.dateSection) ||
+                                isDateToday(msg.prePlainText) ||
+                                (!msg.dateSection && !isDateYesterday(msg.prePlainText) && !msg.prePlainText.includes('/'));
+
+                            if (isToday) {
+                                messagesProcessed++;
+                                for (const rawLink of msg.rawLinks) {
+                                    const link = cleanExtractedUrl(rawLink);
+                                    if (isMatchingDomain(link, source)) {
+                                        groupLinks.push(link);
+                                        allJobLinks.add(link);
+                                    }
+                                }
+                            }
+                        }
+                    } else if (scope === "yesterday") {
+                        for (const msg of rawMessages) {
+                            const isYesterday =
+                                isDateYesterday(msg.dateSection) ||
+                                isDateYesterday(msg.prePlainText);
+
+                            if (isYesterday) {
+                                messagesProcessed++;
+                                for (const rawLink of msg.rawLinks) {
+                                    const link = cleanExtractedUrl(rawLink);
+                                    if (isMatchingDomain(link, source)) {
+                                        groupLinks.push(link);
+                                        allJobLinks.add(link);
+                                    }
                                 }
                             }
                         }
                     }
-                } else if (scope === "today") {
-                    for (const msg of rawMessages) {
-                        const isToday =
-                            isDateToday(msg.dateSection) ||
-                            isDateToday(msg.prePlainText) ||
-                            (!msg.dateSection && !isDateYesterday(msg.prePlainText) && !msg.prePlainText.includes('/'));
 
-                        if (isToday) {
-                            messagesProcessed++;
-                            for (const rawLink of msg.rawLinks) {
-                                const link = cleanExtractedUrl(rawLink);
-                                if (isMatchingDomain(link, group)) {
-                                    groupLinks.push(link);
-                                    allJobLinks.add(link);
-                                }
-                            }
-                        }
-                    }
-                } else if (scope === "yesterday") {
-                    for (const msg of rawMessages) {
-                        const isYesterday =
-                            isDateYesterday(msg.dateSection) ||
-                            isDateYesterday(msg.prePlainText);
+                    const deduplicatedGroupLinks = Array.from(new Set(groupLinks));
+                    const successResult: SourceScrapeResult = {
+                        sourceName: source.name,
+                        sourceType: "group",
+                        targetDomain: source.targetDomain,
+                        status: "success",
+                        unreadCount: scope === "unread" ? unreadCount : undefined,
+                        messagesRendered: renderedCount,
+                        messagesProcessed,
+                        extractedLinks: deduplicatedGroupLinks,
+                    };
 
-                        if (isYesterday) {
-                            messagesProcessed++;
-                            for (const rawLink of msg.rawLinks) {
-                                const link = cleanExtractedUrl(rawLink);
-                                if (isMatchingDomain(link, group)) {
-                                    groupLinks.push(link);
-                                    allJobLinks.add(link);
-                                }
-                            }
-                        }
+                    sourceResults.push(successResult);
+                    processedSources++;
+                    processedGroups++;
+
+                    emit({
+                        type: "source_complete",
+                        sourceType: "group",
+                        sourceName: source.name,
+                        result: successResult,
+                    });
+                    emit({
+                        type: "group_complete",
+                        groupName: source.name,
+                        result: { ...successResult, groupName: source.name },
+                    });
+
+                    await randomJitter(800, 1800);
+                } else if (source.type === "channel") {
+                    // 1. Navigate to Channels tab
+                    await navigateToChannelsTab(page);
+
+                    emit({
+                        type: "source_progress",
+                        sourceType: "channel",
+                        sourceName: source.name,
+                        message: `Locating followed channel '${source.name}'...`,
+                    });
+
+                    // 2. Open followed channel
+                    const openResult = await openFollowedChannel(page, source.name, scope);
+
+                    if (openResult.status === "skipped_no_unread") {
+                        const skipResult: SourceScrapeResult = {
+                            sourceName: source.name,
+                            sourceType: "channel",
+                            targetDomain: source.targetDomain,
+                            status: "skipped",
+                            unreadCount: 0,
+                            extractedLinks: [],
+                            warning: "No unread messages detected",
+                        };
+                        sourceResults.push(skipResult);
+                        skippedSources++;
+                        emit({
+                            type: "source_complete",
+                            sourceType: "channel",
+                            sourceName: source.name,
+                            result: skipResult,
+                        });
+                        continue;
                     }
+
+                    if (openResult.status === "not_found") {
+                        const notFoundResult: SourceScrapeResult = {
+                            sourceName: source.name,
+                            sourceType: "channel",
+                            targetDomain: source.targetDomain,
+                            status: "warning",
+                            extractedLinks: [],
+                            warning: `Channel '${source.name}' not found in followed channels list`,
+                        };
+                        sourceResults.push(notFoundResult);
+                        failedSources++;
+                        emit({
+                            type: "source_complete",
+                            sourceType: "channel",
+                            sourceName: source.name,
+                            result: notFoundResult,
+                        });
+                        continue;
+                    }
+
+                    const unreadCount = openResult.unreadCount;
+
+                    emit({
+                        type: "source_progress",
+                        sourceType: "channel",
+                        sourceName: source.name,
+                        message: "Extracting broadcast channel feed links...",
+                        unreadCount: scope === "unread" ? unreadCount : undefined,
+                    });
+
+                    // 3. Extract channel broadcast links
+                    const { links, renderedCount, processedCount } = await extractChannelBroadcastLinks(
+                        page,
+                        source,
+                        scope,
+                        unreadCount
+                    );
+
+                    for (const link of links) {
+                        allJobLinks.add(link);
+                    }
+
+                    const successResult: SourceScrapeResult = {
+                        sourceName: source.name,
+                        sourceType: "channel",
+                        targetDomain: source.targetDomain,
+                        status: "success",
+                        unreadCount: scope === "unread" ? unreadCount : undefined,
+                        messagesRendered: renderedCount,
+                        messagesProcessed: processedCount,
+                        extractedLinks: links,
+                    };
+
+                    sourceResults.push(successResult);
+                    processedSources++;
+                    processedChannels++;
+
+                    emit({
+                        type: "source_complete",
+                        sourceType: "channel",
+                        sourceName: source.name,
+                        result: successResult,
+                    });
+
+                    await randomJitter(800, 1800);
                 }
-
-                const deduplicatedGroupLinks = Array.from(new Set(groupLinks));
-                const successResult: GroupScrapeResult = {
-                    groupName: group.groupName,
-                    targetDomain: group.targetDomain,
-                    status: "success",
-                    unreadCount: scope === "unread" ? unreadCount : undefined,
-                    messagesRendered: renderedCount,
-                    messagesProcessed,
-                    extractedLinks: deduplicatedGroupLinks,
-                };
-
-                groupResults.push(successResult);
-                processedGroups++;
-
-                emit({
-                    type: "group_complete",
-                    groupName: group.groupName,
-                    result: successResult,
-                });
-
-                // Human-like inter-group jitter delay before processing the next group
-                await randomJitter(800, 1800);
-            } catch (groupError: any) {
-                console.error(`Error processing group '${group.groupName}':`, groupError);
-                const errResult: GroupScrapeResult = {
-                    groupName: group.groupName,
-                    targetDomain: group.targetDomain,
+            } catch (sourceError: any) {
+                console.error(`Error processing ${source.type} '${source.name}':`, sourceError);
+                const errResult: SourceScrapeResult = {
+                    sourceName: source.name,
+                    sourceType: source.type,
+                    targetDomain: source.targetDomain,
                     status: "failed",
                     extractedLinks: [],
-                    error: groupError?.message || "Unexpected group processing error",
+                    error: sourceError?.message || `Unexpected ${source.type} processing error`,
                 };
-                groupResults.push(errResult);
-                failedGroups++;
+                sourceResults.push(errResult);
+                failedSources++;
                 emit({
-                    type: "group_complete",
-                    groupName: group.groupName,
+                    type: "source_complete",
+                    sourceType: source.type,
+                    sourceName: source.name,
                     result: errResult,
                 });
+                if (source.type === "group") {
+                    emit({
+                        type: "group_complete",
+                        groupName: source.name,
+                        result: { ...errResult, groupName: source.name },
+                    });
+                }
                 await randomJitter(600, 1200);
             }
         }
@@ -954,13 +1329,22 @@ export async function scrapeWhatsAppLinks(
         const completedAt = new Date().toISOString();
         const durationMs = Date.now() - startTime;
 
+        const groupResults: GroupScrapeResult[] = sourceResults
+            .filter((r) => r.sourceType === "group")
+            .map((r) => ({ ...r, groupName: r.sourceName }));
+
         const importResult: WhatsAppImportResult = {
             success: true,
             scope,
-            totalGroups: groupsToScrape.length,
+            totalSources: sourcesToScrape.length,
+            totalGroups,
+            totalChannels,
+            processedSources,
             processedGroups,
-            skippedGroups,
-            failedGroups,
+            processedChannels,
+            skippedSources,
+            failedSources,
+            sourceResults,
             groupResults,
             urls: finalUrls,
             totalUrls: finalUrls.length,
@@ -983,7 +1367,11 @@ export async function scrapeWhatsAppLinks(
         });
         throw fatalError;
     } finally {
-        await context.close().catch(() => {});
+        await context.close().catch(() => { });
     }
 }
 
+/**
+ * Named alias for scrapeWhatsAppJobLinks.
+ */
+export const scrapeWhatsAppLinks = scrapeWhatsAppJobLinks;

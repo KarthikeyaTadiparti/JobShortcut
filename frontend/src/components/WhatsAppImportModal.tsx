@@ -23,7 +23,7 @@ interface WhatsAppImportModalProps {
 }
 
 interface LogEntry {
-  type: 'status' | 'group' | 'complete' | 'error';
+  type: 'status' | 'group' | 'channel' | 'complete' | 'error';
   message: string;
   time: string;
 }
@@ -128,22 +128,27 @@ export default function WhatsAppImportModal({
             addLog('status', 'WhatsApp session authenticated successfully!');
             toast.success('WhatsApp connected!');
           },
-          onGroupStart: (groupName, targetDomain, index, total) => {
-            setCurrentProgress(`[${index}/${total}] Searching ${groupName} (${targetDomain})...`);
-            addLog('group', `Checking group (${index}/${total}): ${groupName}`);
+          onSourceStart: (sourceType, sourceName, targetDomain, index, total) => {
+            const tag = sourceType === 'channel' ? 'Channel' : 'Group';
+            setCurrentProgress(`[${index}/${total}] ${tag}: ${sourceName} (${targetDomain})...`);
+            addLog(
+              sourceType === 'channel' ? 'channel' : 'group',
+              `Checking ${tag.toLowerCase()} (${index}/${total}): ${sourceName}`
+            );
           },
-          onGroupProgress: (groupName, message) => {
-            setCurrentProgress(`${groupName}: ${message}`);
+          onSourceProgress: (_sourceType, sourceName, message) => {
+            setCurrentProgress(`${sourceName}: ${message}`);
           },
-          onGroupComplete: (_groupName, result) => {
+          onSourceComplete: (sourceType, _sourceName, result) => {
+            const tag = sourceType === 'channel' ? '[Channel]' : '[Group]';
             if (result.status === 'success') {
-              addLog('complete', `✓ ${result.groupName}: Extracted ${result.extractedLinks.length} job link(s)`);
+              addLog('complete', `✓ ${tag} ${result.sourceName}: Extracted ${result.extractedLinks.length} job link(s)`);
             } else if (result.status === 'skipped') {
-              addLog('status', `○ ${result.groupName}: Skipped (${result.warning || 'No unread'})`);
+              addLog('status', `○ ${tag} ${result.sourceName}: Skipped (${result.warning || 'No unread'})`);
             } else if (result.status === 'warning') {
-              addLog('status', `⚠ ${result.groupName}: ${result.warning}`);
+              addLog('status', `⚠ ${tag} ${result.sourceName}: ${result.warning}`);
             } else {
-              addLog('error', `✗ ${result.groupName}: ${result.error || 'Failed'}`);
+              addLog('error', `✗ ${tag} ${result.sourceName}: ${result.error || 'Failed'}`);
             }
           },
           onDone: (result) => {
@@ -186,7 +191,7 @@ export default function WhatsAppImportModal({
               Import from WhatsApp
             </h3>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Scan group messages, filter target domains, and populate job links directly.
+              Scan group chats and broadcast channel feeds, filter target domains, and populate job links directly.
             </p>
           </div>
           <button
@@ -299,6 +304,8 @@ export default function WhatsAppImportModal({
                           ? 'text-emerald-500 font-semibold'
                           : log.type === 'error'
                           ? 'text-red-400 font-semibold'
+                          : log.type === 'channel'
+                          ? 'text-emerald-400 font-medium'
                           : log.type === 'group'
                           ? 'text-indigo-400 font-medium'
                           : 'text-muted-foreground'
@@ -321,7 +328,9 @@ export default function WhatsAppImportModal({
                 <div>
                   <h4 className="text-xs font-bold text-foreground">Import Complete</h4>
                   <p className="text-[11px] text-muted-foreground mt-0.5">
-                    Harvested <strong className="text-foreground">{finalResult.totalUrls}</strong> unique links from {finalResult.processedGroups} groups.
+                    Harvested <strong className="text-foreground">{finalResult.totalUrls}</strong> unique links from{' '}
+                    <span className="font-semibold text-foreground">{finalResult.processedGroups || 0}</span> groups and{' '}
+                    <span className="font-semibold text-foreground">{finalResult.processedChannels || 0}</span> channels.
                   </p>
                 </div>
               </div>
@@ -386,4 +395,3 @@ export default function WhatsAppImportModal({
     </div>
   );
 }
-

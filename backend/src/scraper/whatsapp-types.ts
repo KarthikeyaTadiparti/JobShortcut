@@ -1,11 +1,24 @@
-import type { WhatsAppGroupConfig } from "../config/whatsapp-groups.js";
+import type {
+    WhatsAppSourceType,
+    WhatsAppSourceConfig,
+    WhatsAppGroupConfig,
+    WhatsAppChannelConfig,
+} from "../config/whatsapp-sources.js";
 
-export type { WhatsAppGroupConfig };
+export type {
+    WhatsAppSourceType,
+    WhatsAppSourceConfig,
+    WhatsAppGroupConfig,
+    WhatsAppChannelConfig,
+};
 
 export type ExtractionScope = 'unread' | 'today' | 'yesterday';
 
 export interface WhatsAppScrapeOptions {
     scope: ExtractionScope;
+    /** Unified array of WhatsApp groups and channels to scrape */
+    sources?: WhatsAppSourceConfig[] | undefined;
+    /** Legacy groups parameter for backward compatibility */
     groups?: WhatsAppGroupConfig[] | undefined;
     sessionDir?: string | undefined;
     headless?: boolean | undefined;
@@ -13,8 +26,9 @@ export interface WhatsAppScrapeOptions {
     signal?: AbortSignal | undefined;
 }
 
-export interface GroupScrapeResult {
-    groupName: string;
+export interface SourceScrapeResult {
+    sourceName: string;
+    sourceType: WhatsAppSourceType;
     targetDomain: string;
     status: 'success' | 'skipped' | 'failed' | 'warning';
     unreadCount?: number | undefined;
@@ -25,14 +39,25 @@ export interface GroupScrapeResult {
     error?: string | undefined;
 }
 
+/** Backward-compatible alias for GroupScrapeResult */
+export interface GroupScrapeResult extends SourceScrapeResult {
+    groupName: string;
+}
+
 export interface WhatsAppImportResult {
     success: boolean;
     scope: ExtractionScope;
+    totalSources: number;
     totalGroups: number;
+    totalChannels: number;
+    processedSources: number;
     processedGroups: number;
-    skippedGroups: number;
-    failedGroups: number;
-    groupResults: GroupScrapeResult[];
+    processedChannels: number;
+    skippedSources: number;
+    failedSources: number;
+    sourceResults: SourceScrapeResult[];
+    /** Backward compatibility alias for groupResults */
+    groupResults?: GroupScrapeResult[];
     urls: string[];
     totalUrls: number;
     startedAt: string;
@@ -44,6 +69,9 @@ export type WhatsAppSSEEvent =
     | { type: 'status'; message: string; timestamp: string }
     | { type: 'qr'; qrDataUrl: string; timestamp: string }
     | { type: 'authenticated'; timestamp: string }
+    | { type: 'source_start'; sourceType: WhatsAppSourceType; sourceName: string; targetDomain: string; index: number; total: number }
+    | { type: 'source_progress'; sourceType: WhatsAppSourceType; sourceName: string; message: string; unreadCount?: number | undefined }
+    | { type: 'source_complete'; sourceType: WhatsAppSourceType; sourceName: string; result: SourceScrapeResult }
     | { type: 'group_start'; groupName: string; targetDomain: string; index: number; total: number }
     | { type: 'group_progress'; groupName: string; message: string; unreadCount?: number | undefined }
     | { type: 'group_complete'; groupName: string; result: GroupScrapeResult }

@@ -63,9 +63,11 @@ export async function startScraperStream(urls: string, callbacks: ScrapeCallback
 }
 
 export type ExtractionScope = 'unread' | 'today' | 'yesterday';
+export type WhatsAppSourceType = 'group' | 'channel';
 
-export interface GroupScrapeResult {
-  groupName: string;
+export interface SourceScrapeResult {
+  sourceName: string;
+  sourceType: WhatsAppSourceType;
   targetDomain: string;
   status: 'success' | 'skipped' | 'failed' | 'warning';
   unreadCount?: number;
@@ -76,14 +78,23 @@ export interface GroupScrapeResult {
   error?: string;
 }
 
+export interface GroupScrapeResult extends SourceScrapeResult {
+  groupName: string;
+}
+
 export interface WhatsAppImportResult {
   success: boolean;
   scope: ExtractionScope;
+  totalSources: number;
   totalGroups: number;
+  totalChannels: number;
+  processedSources: number;
   processedGroups: number;
-  skippedGroups: number;
-  failedGroups: number;
-  groupResults: GroupScrapeResult[];
+  processedChannels: number;
+  skippedSources: number;
+  failedSources: number;
+  sourceResults: SourceScrapeResult[];
+  groupResults?: GroupScrapeResult[];
   urls: string[];
   totalUrls: number;
   startedAt: string;
@@ -95,6 +106,9 @@ export interface WhatsAppScrapeCallbacks {
   onStatus?: (message: string) => void;
   onQR?: (qrDataUrl: string) => void;
   onAuthenticated?: () => void;
+  onSourceStart?: (sourceType: WhatsAppSourceType, sourceName: string, targetDomain: string, index: number, total: number) => void;
+  onSourceProgress?: (sourceType: WhatsAppSourceType, sourceName: string, message: string, unreadCount?: number) => void;
+  onSourceComplete?: (sourceType: WhatsAppSourceType, sourceName: string, result: SourceScrapeResult) => void;
   onGroupStart?: (groupName: string, targetDomain: string, index: number, total: number) => void;
   onGroupProgress?: (groupName: string, message: string, unreadCount?: number) => void;
   onGroupComplete?: (groupName: string, result: GroupScrapeResult) => void;
@@ -159,6 +173,26 @@ export async function startWhatsAppScraperStream(
               break;
             case 'authenticated':
               callbacks.onAuthenticated?.();
+              break;
+            case 'source_start':
+              callbacks.onSourceStart?.(
+                eventData.sourceType,
+                eventData.sourceName,
+                eventData.targetDomain,
+                eventData.index,
+                eventData.total
+              );
+              break;
+            case 'source_progress':
+              callbacks.onSourceProgress?.(
+                eventData.sourceType,
+                eventData.sourceName,
+                eventData.message,
+                eventData.unreadCount
+              );
+              break;
+            case 'source_complete':
+              callbacks.onSourceComplete?.(eventData.sourceType, eventData.sourceName, eventData.result);
               break;
             case 'group_start':
               callbacks.onGroupStart?.(

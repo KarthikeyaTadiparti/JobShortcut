@@ -13,10 +13,10 @@ interface DomInspectionResult {
   name: string;
   category: string;
   status: "OPERATIONAL" | "DEGRADED" | "BROKEN" | "SKIPPED";
-  matchedSelector?: string;
+  matchedSelector?: string | undefined;
   elementCount: number;
-  sampleHtml?: string;
-  sampleAttributes?: Record<string, string>;
+  sampleHtml?: string | undefined;
+  sampleAttributes?: Record<string, string> | undefined;
 }
 
 async function waitForWhatsAppReady(page: Page, maxWaitMs = 45000): Promise<void> {
@@ -30,7 +30,7 @@ async function waitForWhatsAppReady(page: Page, maxWaitMs = 45000): Promise<void
     // ignore
   }
 
-  const readyLoc = page.locator('#pane-side, [data-testid="chat-list"], #main, canvas, div[data-ref]');
+  const readyLoc = page.locator('#pane-side, [data-testid="chat-list"], #main, canvas, div[data-ref], [data-icon="newsletter"]');
   await readyLoc.first().waitFor({ state: "visible", timeout: maxWaitMs }).catch(() => {});
   await page.waitForTimeout(2000);
 }
@@ -39,8 +39,12 @@ async function extractDomAndVerify(): Promise<void> {
   // Parse command line arguments
   const args = process.argv.slice(2);
   const headed = args.includes("--headed");
+  const isChannelsMode = args.includes("--channels") || args.some((a) => a.startsWith("--channel="));
+  const targetChannelArg = args.find((a) => a.startsWith("--channel="));
+  const targetChannel = targetChannelArg ? targetChannelArg.split("=")[1] : "Freshershunt";
+
   const targetGroupArg = args.find((a) => a.startsWith("--group="));
-  const targetGroup = targetGroupArg ? targetGroupArg.split("=")[1] : "Jobcode 37";
+  const targetGroup = targetGroupArg ? targetGroupArg.split("=")[1] : (isChannelsMode ? "" : "Jobcode 37");
 
   const outputDir = path.resolve(__dirname, "../../artifacts");
   if (!fs.existsSync(outputDir)) {
@@ -58,7 +62,7 @@ async function extractDomAndVerify(): Promise<void> {
   console.log(`================================================================================`);
   console.log(`📁 Session Dir:    ${sessionDir}`);
   console.log(`🖥️  Mode:           ${headed ? "Headed (Browser Visible)" : "Headless"}`);
-  console.log(`🎯 Target Group:   ${targetGroup}`);
+  console.log(`🎯 Ingestion Type: ${isChannelsMode ? `Channel ("${targetChannel}")` : `Group ("${targetGroup}")`}`);
   console.log(`📦 Output Dir:     ${outputDir}\n`);
 
   console.log("🚀 Launching Chromium persistent context...");
@@ -88,9 +92,38 @@ async function extractDomAndVerify(): Promise<void> {
     await page.goto("https://web.whatsapp.com", { waitUntil: "domcontentloaded", timeout: 60000 });
     await waitForWhatsAppReady(page);
 
-    // If target group provided and chat list is present, search and open the chat
-    const hasSidePane = await page.locator("#pane-side, #side").first().isVisible().catch(() => false);
-    if (hasSidePane && targetGroup) {
+    if (isChannelsMode) {
+      console.log(`📺 Navigating to Channels / Updates tab...`);
+      const channelsTab = page.locator(
+        'button[aria-label="Channels"], button[aria-label="Updates"], [data-testid="menu-bar-chats-channels"], [data-icon="newsletter"]'
+      ).first();
+
+      if (await channelsTab.isVisible({ timeout: 5000 }).catch(() => false)) {
+        await channelsTab.click();
+        console.log(`✅ Clicked Channels tab button`);
+        await page.waitForTimeout(2500);
+
+        // Click target channel
+        console.log(`🔍 Locating and opening channel: "${targetChannel}"...`);
+        const channelItem = page.locator(
+          `button[aria-label*="${targetChannel}" i], [aria-label="Channel list"] button:has-text("${targetChannel}"), div[role="listitem"]:has-text("${targetChannel}"), button:has-text("${targetChannel}")`
+        ).first();
+
+        if (await channelItem.isVisible({ timeout: 4000 }).catch(() => false)) {
+          await channelItem.click({ force: true });
+          console.log(`✅ Clicked channel: "${targetChannel}"`);
+          await page.waitForTimeout(3000);
+        } else {
+          // Fall back to first channel
+          const firstChannel = page.locator('[aria-label="Channel list"] button, [role="listitem"] button').first();
+          if (await firstChannel.isVisible({ timeout: 2000 }).catch(() => false)) {
+            await firstChannel.click({ force: true });
+            console.log(`✅ Clicked first available channel in list`);
+            await page.waitForTimeout(3000);
+          }
+        }
+      }
+    } else if (targetGroup) {
       console.log(`🔍 Searching and opening chat: "${targetGroup}"...`);
       try {
         const searchInput = page
@@ -126,8 +159,8 @@ async function extractDomAndVerify(): Promise<void> {
     fs.writeFileSync(outputHtmlPath, fullHtml, "utf-8");
     console.log(`✅ Saved full DOM snapshot (${(fullHtml.length / 1024).toFixed(1)} KB) -> ${outputHtmlPath}`);
 
-    // 2. Extract Scoped Side Pane (#side)
-    const sidePane = page.locator("#side, #pane-side").first();
+    // 2. Extract Scoped Side Pane (#side or Channel Drawer)
+    const sidePane = page.locator("#side, #pane-side, div[aria-label='Channel list']").first();
     if (await sidePane.isVisible().catch(() => false)) {
       const sideHtml = await sidePane.evaluate((el) => el.outerHTML);
       fs.writeFileSync(outputSideHtmlPath, sideHtml, "utf-8");

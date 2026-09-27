@@ -16,6 +16,7 @@
     "test:locators": "playwright test",
     "test:locators:auth": "playwright test tests/auth-locators.spec.ts",
     "test:locators:chat": "playwright test tests/chat-locators.spec.ts",
+    "test:locators:channel": "playwright test tests/channel-locators.spec.ts",
     "test:locators:report": "playwright show-report",
     "extract:dom": "tsx src/scripts/extract_whatsapp_dom.ts"
   },

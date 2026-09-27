@@ -1,19 +1,24 @@
-import { scrapeWhatsAppLinks } from "./whatsapp_scraper.js";
+import { scrapeWhatsAppJobLinks } from "./whatsapp_scraper.js";
 import type { ExtractionScope } from "./whatsapp-types.js";
 
 async function main() {
-    const rawScope = (process.argv[2] || "unread").toLowerCase();
-    const scope: ExtractionScope = ["unread", "today", "yesterday"].includes(rawScope)
-        ? (rawScope as ExtractionScope)
+    // Support positional or flag args: --scope=today or today
+    const rawArg = process.argv.slice(2).find((a) => !a.startsWith("-")) ||
+        process.argv.slice(2).find((a) => a.startsWith("--scope="))?.split("=")[1] ||
+        "unread";
+
+    const normalizedArg = rawArg.toLowerCase().trim();
+    const scope: ExtractionScope = ["unread", "today", "yesterday"].includes(normalizedArg)
+        ? (normalizedArg as ExtractionScope)
         : "unread";
 
     console.log(`\n=================== WHATSAPP JOB LINK SCRAPER ===================`);
     console.log(`Scope: ${scope.toUpperCase()}`);
-    console.log(`Mode: Automated Playwright Web extraction`);
+    console.log(`Mode: Automated Playwright Web extraction (Groups & Broadcast Channels)`);
     console.log(`=================================================================\n`);
 
     try {
-        const result = await scrapeWhatsAppLinks(
+        const result = await scrapeWhatsAppJobLinks(
             {
                 scope,
                 headless: false, // Run with visual browser window in CLI mode for ease of QR scanning
@@ -29,13 +34,13 @@ async function main() {
                     case "authenticated":
                         console.log(`[AUTH] Session authenticated successfully!`);
                         break;
-                    case "group_start":
-                        console.log(`\n[GROUP ${event.index}/${event.total}] ${event.groupName} (${event.targetDomain})`);
+                    case "source_start":
+                        console.log(`\n[${event.sourceType.toUpperCase()} ${event.index}/${event.total}] ${event.sourceName} (${event.targetDomain})`);
                         break;
-                    case "group_progress":
+                    case "source_progress":
                         console.log(`  -> ${event.message}`);
                         break;
-                    case "group_complete":
+                    case "source_complete":
                         if (event.result.status === "success") {
                             console.log(`  ✓ Extracted ${event.result.extractedLinks.length} link(s):`);
                             event.result.extractedLinks.forEach((l) => console.log(`     * ${l}`));
@@ -49,9 +54,10 @@ async function main() {
                         break;
                     case "done":
                         console.log(`\n=================== HARVEST COMPLETED ===================`);
-                        console.log(`Total Groups Evaluated: ${event.result.totalGroups}`);
-                        console.log(`Groups Processed: ${event.result.processedGroups}`);
-                        console.log(`Groups Skipped: ${event.result.skippedGroups}`);
+                        console.log(`Total Sources Evaluated: ${event.result.totalSources} (${event.result.totalGroups} groups, ${event.result.totalChannels} channels)`);
+                        console.log(`Sources Processed: ${event.result.processedSources} (${event.result.processedGroups} groups, ${event.result.processedChannels} channels)`);
+                        console.log(`Sources Skipped: ${event.result.skippedSources}`);
+                        console.log(`Sources Failed: ${event.result.failedSources}`);
                         console.log(`Total Unique Job URLs: ${event.result.totalUrls}`);
                         console.log(`Duration: ${(event.result.durationMs / 1000).toFixed(1)}s`);
                         console.log(`\nExtracted Job URLs:`);

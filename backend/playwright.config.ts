@@ -54,5 +54,9 @@ export default defineConfig({
       name: "chat-locators",
       testMatch: /chat-locators\.spec\.ts/,
     },
+    {
+      name: "channel-locators",
+      testMatch: /channel-locators\.spec\.ts/,
+    },
   ],
 });

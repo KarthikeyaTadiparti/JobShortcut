@@ -1,0 +1,180 @@
+openapi: 3.0.3
+info:
+  title: JobShortcut WhatsApp Unified Import API
+  version: 1.1.0
+  description: Endpoints for triggering and streaming unified WhatsApp Group & Channel job link extraction.
+
+paths:
+  /api/admin/whatsapp/scrape:
+    post:
+      summary: Trigger unified WhatsApp scraping workflow
+      description: Launches headless Playwright extraction across configured groups and channels for the given timeframe scope.
+      tags:
+        - WhatsApp Scraper
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - scope
+              properties:
+                scope:
+                  type: string
+                  enum: [unread, today, yesterday]
+                  default: unread
+                sources:
+                  type: array
+                  description: Optional custom source list override
+                  items:
+                    $ref: '#/components/schemas/WhatsAppSourceConfig'
+      responses:
+        '200':
+          description: Extraction completed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/WhatsAppImportResult'
+        '401':
+          description: Unauthorized admin access
+        '500':
+          description: Fatal error during extraction
+
+  /api/admin/whatsapp/scrape/stream:
+    get:
+      summary: SSE Stream for real-time extraction progress
+      description: Server-Sent Events stream emitting progress across group and channel extraction steps.
+      tags:
+        - WhatsApp Scraper
+      parameters:
+        - in: query
+          name: scope
+          schema:
+            type: string
+            enum: [unread, today, yesterday]
+            default: unread
+      responses:
+        '200':
+          description: SSE event stream
+          content:
+            text/event-stream:
+              schema:
+                type: string
+
+components:
+  schemas:
+    WhatsAppSourceType:
+      type: string
+      enum: [group, channel]
+
+    WhatsAppSourceConfig:
+      type: object
+      required:
+        - type
+        - name
+        - targetDomain
+      properties:
+        type:
+          $ref: '#/components/schemas/WhatsAppSourceType'
+        name:
+          type: string
+          example: "Found The Job Alerts"
+        targetDomain:
+          type: string
+          example: "foundthejob.com"
+        allowedDomains:
+          type: array
+          items:
+            type: string
+          example: ["foundthejob.com"]
+        enabled:
+          type: boolean
+          default: true
+
+    SourceScrapeResult:
+      type: object
+      required:
+        - sourceName
+        - sourceType
+        - targetDomain
+        - status
+        - extractedLinks
+      properties:
+        sourceName:
+          type: string
+        sourceType:
+          $ref: '#/components/schemas/WhatsAppSourceType'
+        targetDomain:
+          type: string
+        status:
+          type: string
+          enum: [success, skipped, failed, warning]
+        unreadCount:
+          type: integer
+        messagesRendered:
+          type: integer
+        messagesProcessed:
+          type: integer
+        extractedLinks:
+          type: array
+          items:
+            type: string
+        warning:
+          type: string
+        error:
+          type: string
+
+    WhatsAppImportResult:
+      type: object
+      required:
+        - success
+        - scope
+        - totalSources
+        - processedSources
+        - urls
+        - totalUrls
+      properties:
+        success:
+          type: boolean
+        scope:
+          type: string
+          enum: [unread, today, yesterday]
+        totalSources:
+          type: integer
+        totalGroups:
+          type: integer
+        totalChannels:
+          type: integer
+        processedSources:
+          type: integer
+        processedGroups:
+          type: integer
+        processedChannels:
+          type: integer
+        skippedSources:
+          type: integer
+        failedSources:
+          type: integer
+        sourceResults:
+          type: array
+          items:
+            $ref: '#/components/schemas/SourceScrapeResult'
+        urls:
+          type: array
+          items:
+            type: string
+        totalUrls:
+          type: integer
+        startedAt:
+          type: string
+        completedAt:
+          type: string
+        durationMs:
+          type: number

@@ -1,18 +1,25 @@
 import type { Request, Response } from "express";
 import wrapAsync from "../utils/wrap-async.js";
 import { initSSEStream } from "../utils/sse-stream.js";
-import { scrapeWhatsAppLinks } from "../scraper/whatsapp_scraper.js";
+import { scrapeWhatsAppJobLinks } from "../scraper/whatsapp_scraper.js";
 import {
     launchWhatsAppContext,
     checkWhatsAppAuthState,
 } from "../scraper/whatsapp_session.js";
-import type { ExtractionScope, WhatsAppGroupConfig, WhatsAppScrapeOptions } from "../scraper/whatsapp-types.js";
+import type {
+    ExtractionScope,
+    WhatsAppSourceConfig,
+    WhatsAppGroupConfig,
+    WhatsAppScrapeOptions,
+} from "../scraper/whatsapp-types.js";
 
 /**
  * Controller to handle WhatsApp scraper requests with real-time SSE streaming.
+ * Supports unified sources (groups & channels) as well as legacy groups format.
  */
 export const handleWhatsAppScrape = wrapAsync(async (req: Request, res: Response) => {
     const scope: ExtractionScope = req.body.scope || "unread";
+    const sources: WhatsAppSourceConfig[] | undefined = req.body.sources;
     const groups: WhatsAppGroupConfig[] | undefined = req.body.groups;
     const headless: boolean | undefined = req.body.headless;
 
@@ -28,13 +35,14 @@ export const handleWhatsAppScrape = wrapAsync(async (req: Request, res: Response
 
     const scrapeOptions: WhatsAppScrapeOptions = {
         scope,
+        sources,
         groups,
         headless,
         signal: abortController.signal,
     };
 
     try {
-        await scrapeWhatsAppLinks(
+        await scrapeWhatsAppJobLinks(
             scrapeOptions,
             (event) => {
                 if (!abortController.signal.aborted) {
@@ -67,7 +75,7 @@ export const handleWhatsAppStatus = wrapAsync(async (_req: Request, res: Respons
             const authState = await checkWhatsAppAuthState(page, 5000);
             authenticated = authState.authenticated;
         } finally {
-            await context.close().catch(() => {});
+            await context.close().catch(() => { });
         }
     } catch (error) {
         console.warn("Could not check WhatsApp status:", error);
