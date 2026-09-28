@@ -13,7 +13,7 @@ const sessionDir = path.resolve(__dirname, "../../.whatsapp_session");
 
 const TARGET_GROUP_NAME = "Jobcode 37";
 
-test.describe("WhatsApp Authenticated Chat UI & Message Locators", () => {
+test.describe("WhatsApp Authenticated Chat UI & Message Locators", { tag: ["@locator", "@chat-locator"] }, () => {
   let context: BrowserContext;
   let page: Page;
   const results: LocatorValidationResult[] = [];

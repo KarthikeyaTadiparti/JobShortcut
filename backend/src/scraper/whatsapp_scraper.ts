@@ -479,57 +479,65 @@ export async function openFollowedChannel(
         const channelChatTitleSel = getCombinedSelector(WHATSAPP_LOCATORS.channelChatTitle);
         const channelHeaderSel = getCombinedSelector(WHATSAPP_LOCATORS.channelHeader);
 
-        const alreadyOpen = await page.evaluate(({ targetName, titleSel, headerSel }) => {
-            const header = document.querySelector(titleSel) || document.querySelector(headerSel);
-            const text = header?.textContent?.trim() || "";
-            if (!text) return false;
-            const h = text.toLowerCase();
-            const t = targetName.toLowerCase().trim();
-            const prefix = t.replace(/\s*[-–(].*$/, '').trim();
-            return h === t || h.includes(t) || t.includes(h) || (prefix.length >= 3 && h.includes(prefix));
-        }, { targetName: channelName, titleSel: channelChatTitleSel, headerSel: channelHeaderSel });
+        const alreadyOpen = await page.evaluate(
+            ({ targetName, titleSel, headerSel }) => {
+                const titleEl = document.querySelector(titleSel);
+                const headerEl = document.querySelector(headerSel);
+                const titleText = (titleEl?.getAttribute("title") || titleEl?.textContent || "").trim().toLowerCase();
+                const headerText = (headerEl?.textContent || "").trim().toLowerCase();
+                const expected = targetName.trim().toLowerCase();
 
-        if (alreadyOpen && scope !== "unread") {
+                return titleText === expected || (!!titleText && titleText.includes(expected)) || (!!headerText && headerText.includes(expected));
+            },
+            { targetName: channelName, titleSel: channelChatTitleSel, headerSel: channelHeaderSel }
+        );
+
+        if (alreadyOpen) {
+            if (scope === "unread") {
+                return { status: "skipped_no_unread", unreadCount: 0 };
+            }
             return { status: "opened", unreadCount: 0 };
         }
 
-        // 1. Scan channel list rows in Channels view
+        // Ensure Channels view is active
+        await navigateToChannelsTab(page);
+
         const channelRowSel = getCombinedSelector(WHATSAPP_LOCATORS.channelListRow);
         const channelTitleSel = getCombinedSelector(WHATSAPP_LOCATORS.channelRowTitle);
         const channelBadgeSel = getCombinedSelector(WHATSAPP_LOCATORS.channelRowUnreadBadge);
 
-        const matchInfo = await page.evaluate(({ targetName, rowSelector, titleSelector, badgeSelector }) => {
-            const rows = Array.from(document.querySelectorAll(rowSelector));
-            const lowerTarget = targetName.toLowerCase().trim();
-            const prefix = lowerTarget.replace(/\s*[-–(].*$/, '').trim();
+        // 1. Inspect top followed channels in sidebar list
+        const matchInfo = await page.evaluate(
+            ({ targetName, rowSelector, titleSelector, badgeSelector }) => {
+                const rows = Array.from(document.querySelectorAll(rowSelector)).slice(0, 15);
+                const expected = targetName.trim().toLowerCase();
 
-            for (const [i, row] of rows.entries()) {
-                const titleSpan = row.querySelector(titleSelector);
-                const title = (titleSpan?.getAttribute('title') || titleSpan?.textContent || row.textContent || '').toLowerCase().trim();
+                for (let i = 0; i < rows.length; i++) {
+                    const row = rows[i];
+                    if (!row) continue;
+                    const titleSpan = row.querySelector(titleSelector);
+                    const actualName = (titleSpan?.getAttribute("title") || titleSpan?.textContent || row.textContent || "").trim().toLowerCase();
 
-                if (
-                    title === lowerTarget ||
-                    title.includes(lowerTarget) ||
-                    lowerTarget.includes(title) ||
-                    (prefix.length >= 3 && title.includes(prefix))
-                ) {
-                    let count = 0;
-                    const unreadEl = row.querySelector(badgeSelector);
-                    if (unreadEl) {
-                        const label = unreadEl.getAttribute('aria-label') || unreadEl.textContent || '';
-                        const match = label.match(/\d+/);
-                        if (match) count = parseInt(match[0], 10);
+                    if (actualName === expected || actualName.includes(expected)) {
+                        let unreadCount = 0;
+                        const unreadEl = row.querySelector(badgeSelector);
+                        if (unreadEl) {
+                            const label = unreadEl.getAttribute("aria-label") || unreadEl.textContent || "";
+                            const match = label.match(/\d+/);
+                            if (match) unreadCount = parseInt(match[0], 10);
+                        }
+                        return { index: i, unreadCount };
                     }
-                    return { rowIndex: i, unreadCount: count, foundText: title };
                 }
+                return null;
+            },
+            {
+                targetName: channelName,
+                rowSelector: channelRowSel,
+                titleSelector: channelTitleSel,
+                badgeSelector: channelBadgeSel,
             }
-            return null;
-        }, {
-            targetName: channelName,
-            rowSelector: channelRowSel,
-            titleSelector: channelTitleSel,
-            badgeSelector: channelBadgeSel,
-        });
+        );
 
         if (matchInfo) {
             if (scope === "unread" && matchInfo.unreadCount === 0) {
@@ -537,8 +545,8 @@ export async function openFollowedChannel(
             }
 
             const items = page.locator(channelRowSel);
-            if ((await items.count()) > matchInfo.rowIndex) {
-                await items.nth(matchInfo.rowIndex).click({ force: true }).catch(() => { });
+            if ((await items.count()) > matchInfo.index) {
+                await items.nth(matchInfo.index).click({ force: true }).catch(() => { });
             }
 
             const messageContainerSel = getCombinedSelector(WHATSAPP_LOCATORS.channelMessageContainer);
@@ -560,25 +568,58 @@ export async function openFollowedChannel(
 
         if ((await channelSearchInput.count()) > 0 && (await channelSearchInput.isVisible().catch(() => false))) {
             await channelSearchInput.click({ force: true });
-            await clearActiveSearchInput(page);
-            await channelSearchInput.fill(channelName);
-            await page.waitForTimeout(1000);
+            await page.keyboard.type(channelName, { delay: 40 });
+            await randomJitter(600, 1000);
 
-            const filteredItem = page.locator(channelRowSel).first();
+            const searchMatch = await page.evaluate(
+                ({ targetName, rowSelector, titleSelector, badgeSelector }) => {
+                    const rows = Array.from(document.querySelectorAll(rowSelector)).slice(0, 5);
+                    const expected = targetName.trim().toLowerCase();
 
-            if ((await filteredItem.count()) > 0 && (await filteredItem.isVisible().catch(() => false))) {
-                await filteredItem.click({ force: true }).catch(() => { });
-                await page.waitForTimeout(2000);
+                    for (let i = 0; i < rows.length; i++) {
+                        const row = rows[i];
+                        if (!row) continue;
+                        const titleSpan = row.querySelector(titleSelector);
+                        const actualName = (titleSpan?.getAttribute("title") || titleSpan?.textContent || row.textContent || "").trim().toLowerCase();
+
+                        if (actualName === expected || actualName.includes(expected)) {
+                            let unreadCount = 0;
+                            const unreadEl = row.querySelector(badgeSelector);
+                            if (unreadEl) {
+                                const label = unreadEl.getAttribute("aria-label") || unreadEl.textContent || "";
+                                const match = label.match(/\d+/);
+                                if (match) unreadCount = parseInt(match[0], 10);
+                            }
+                            return { index: i, unreadCount };
+                        }
+                    }
+                    return null;
+                },
+                { targetName: channelName, rowSelector: channelRowSel, titleSelector: channelTitleSel, badgeSelector: channelBadgeSel }
+            );
+
+            if (searchMatch) {
+                if (scope === "unread" && searchMatch.unreadCount === 0) {
+                    await clearActiveSearchInput(page);
+                    return { status: "skipped_no_unread", unreadCount: 0 };
+                }
+
+                await page.locator(channelRowSel).nth(searchMatch.index).click({ force: true });
                 await clearActiveSearchInput(page);
-                return { status: "opened", unreadCount: 0 };
+
+                const messageContainerSel = getCombinedSelector(WHATSAPP_LOCATORS.channelMessageContainer);
+                await page.waitForSelector(messageContainerSel, { state: "visible", timeout: 8000 }).catch(() => { });
+                await page.locator(channelHeaderSel).first().click({ force: true }).catch(() => { });
+                await randomJitter(300, 600);
+
+                return { status: "opened", unreadCount: searchMatch.unreadCount };
             }
+
             await clearActiveSearchInput(page);
         }
 
-        console.warn(`Followed channel '${channelName}' could not be located in Channels view.`);
         return { status: "not_found", unreadCount: 0 };
     } catch (err) {
-        console.warn(`Failed to open channel '${channelName}':`, err);
         await clearActiveSearchInput(page);
         return { status: "not_found", unreadCount: 0 };
     }

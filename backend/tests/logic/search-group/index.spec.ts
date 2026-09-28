@@ -9,7 +9,7 @@ import { registerDefaultTests } from "./default.js";
 
 const KNOWN_GROUP_NAME = DEFAULT_WHATSAPP_GROUPS[0]?.groupName || "Jobcode 37";
 
-test.describe("WhatsApp Search & Open Logic Test Suite", () => {
+test.describe("WhatsApp Search & Open Logic Test Suite", { tag: ["@logic", "@search-group"] }, () => {
   let context: BrowserContext;
   let page: Page;
   let isAuthenticated = false;

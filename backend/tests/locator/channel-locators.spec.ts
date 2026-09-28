@@ -11,7 +11,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const sessionDir = path.resolve(__dirname, "../../.whatsapp_session");
 
-test.describe("WhatsApp Channels UI & Broadcast Feed Locators", () => {
+test.describe("WhatsApp Channels UI & Broadcast Feed Locators", { tag: ["@locator", "@channel-locator"] }, () => {
   let context: BrowserContext;
   let page: Page;
   const results: LocatorValidationResult[] = [];

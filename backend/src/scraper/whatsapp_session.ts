@@ -132,7 +132,7 @@ export async function checkWhatsAppAuthState(page: Page, timeoutMs = 25000): Pro
 
         return { authenticated: false };
     } catch (error) {
-        console.error("Error during WhatsApp auth check:", error);
+        console.error("[ERROR] Error during WhatsApp auth check:", error);
         return { authenticated: false };
     }
 }

@@ -1,0 +1,46 @@
+import { test, type BrowserContext, type Page } from "@playwright/test";
+import { launchWhatsAppContext, checkWhatsAppAuthState } from "../../../src/scraper/whatsapp_session.js";
+import { navigateToChannelsTab } from "../../../src/scraper/whatsapp_scraper.js";
+import { DEFAULT_WHATSAPP_CHANNELS } from "../../../src/config/whatsapp-sources.js";
+
+import { registerChannelUnreadTests } from "./unread.js";
+import { registerChannelTodayTests } from "./today.js";
+import { registerChannelYesterdayTests } from "./yesterday.js";
+import { registerChannelDefaultTests } from "./default.js";
+
+const KNOWN_CHANNEL_NAME = DEFAULT_WHATSAPP_CHANNELS[0]?.channelName || "Found The Job Alerts";
+
+test.describe("WhatsApp Channel Open Logic Test Suite", { tag: ["@logic", "@search-channel"] }, () => {
+  let context: BrowserContext;
+  let page: Page;
+  let isAuthenticated = false;
+
+  test.beforeAll(async () => {
+    await test.step("Launch Chromium persistent context and verify WhatsApp session", async () => {
+      const session = await launchWhatsAppContext({ headless: true });
+      context = session.context;
+      page = session.page;
+
+      const authState = await checkWhatsAppAuthState(page, 35000);
+      isAuthenticated = authState.authenticated;
+
+      if (isAuthenticated) {
+        await navigateToChannelsTab(page);
+      }
+    });
+  });
+
+  test.afterAll(async () => {
+    await test.step("Close browser context", async () => {
+      if (context) {
+        await context.close().catch(() => {});
+      }
+    });
+  });
+
+  // Individual testcases categorized by scope
+  registerChannelUnreadTests(() => ({ page, isAuthenticated, targetChannelName: KNOWN_CHANNEL_NAME }));
+  registerChannelTodayTests(() => ({ page, isAuthenticated, targetChannelName: KNOWN_CHANNEL_NAME }));
+  registerChannelYesterdayTests(() => ({ page, isAuthenticated, targetChannelName: KNOWN_CHANNEL_NAME }));
+  registerChannelDefaultTests(() => ({ page, isAuthenticated, targetChannelName: KNOWN_CHANNEL_NAME }));
+});
