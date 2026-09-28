@@ -2,14 +2,14 @@ import { test, expect, chromium, type BrowserContext, type Page } from "@playwri
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
-import { WHATSAPP_LOCATORS } from "../src/config/whatsapp_locators.js";
-import { validateLocatorWithFallback } from "./helpers/locator-tester.js";
-import { printDiagnosticReport, type LocatorValidationResult } from "./helpers/reporter-formatter.js";
-import { waitForWhatsAppLoadingToComplete } from "./helpers/page-ready.js";
+import { WHATSAPP_LOCATORS } from "../../src/config/whatsapp_locators.js";
+import { validateLocatorWithFallback } from "../helpers/locator-tester.js";
+import { printDiagnosticReport, type LocatorValidationResult } from "../helpers/reporter-formatter.js";
+import { waitForWhatsAppLoadingToComplete } from "../helpers/page-ready.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const sessionDir = path.resolve(__dirname, "../.whatsapp_session");
+const sessionDir = path.resolve(__dirname, "../../.whatsapp_session");
 
 test.describe("WhatsApp Channels UI & Broadcast Feed Locators", () => {
   let context: BrowserContext;
@@ -135,8 +135,6 @@ test.describe("WhatsApp Channels UI & Broadcast Feed Locators", () => {
 
       const isVisible = await channelItem.isVisible({ timeout: 5000 }).catch(() => false);
       if (isVisible) {
-        const text = await channelItem.textContent().catch(() => "");
-        console.log(`[Test] Clicking channel item: ${text.slice(0, 50)}...`);
         await channelItem.click({ force: true }).catch(() => {});
         await page.waitForTimeout(3000);
       }

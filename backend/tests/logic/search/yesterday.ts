@@ -1,0 +1,114 @@
+import { test, expect } from "@playwright/test";
+import { searchAndOpenGroup, type SearchAndOpenResult } from "../../../src/scraper/whatsapp_scraper.js";
+import { WHATSAPP_LOCATORS } from "../../../src/config/whatsapp_locators.js";
+import { highlightElement } from "../../helpers/dom-highlighter.js";
+import type { TestContext } from "./unread.js";
+
+const NON_EXISTENT_GROUP = "NonExistentGroup_TestXYZ_99999";
+
+/**
+ * Registers individual testcases strictly related to 'yesterday' extraction scope.
+ */
+export function registerYesterdayTests(getContext: () => TestContext): void {
+  test.describe("Scope: Yesterday", () => {
+    test("Returns 'not_found' when searching for non-existent group with scope='yesterday'", async () => {
+      const { page, isAuthenticated } = getContext();
+      test.skip(!isAuthenticated, "Requires authenticated WhatsApp session");
+
+      await test.step("1. Spotlight search box input", async () => {
+        const searchInput = page.locator(WHATSAPP_LOCATORS.chatListSearchInput.primary).first();
+        await highlightElement(searchInput, 200);
+      });
+
+      let result!: SearchAndOpenResult;
+      await test.step(`2. Execute searchAndOpenGroup(page, '${NON_EXISTENT_GROUP}', 'yesterday')`, async () => {
+        result = await searchAndOpenGroup(page, NON_EXISTENT_GROUP, "yesterday");
+        await test.info().attach("search-and-open-result", {
+          body: JSON.stringify(result, null, 2),
+          contentType: "application/json",
+        });
+      });
+
+      await test.step(
+        `3. Validate not_found outcome -> Expected: { status: 'not_found', unreadCount: 0 } | Received: { status: '${result?.status}', unreadCount: ${result?.unreadCount} }`,
+        async () => {
+          expect(result, "searchAndOpenGroup must return a defined result object").toBeDefined();
+          expect(
+            result.status,
+            `Expected 'not_found' for non-existent query '${NON_EXISTENT_GROUP}', received '${result?.status}'`
+          ).toBe("not_found");
+          expect(
+            result.unreadCount,
+            `Non-existent group unread count must be 0, received ${result?.unreadCount}`
+          ).toBe(0);
+        }
+      );
+    });
+
+    test("Searches and opens target group with scope='yesterday'", async () => {
+      const { page, isAuthenticated, targetGroupName } = getContext();
+      test.skip(!isAuthenticated, "Requires authenticated WhatsApp session");
+
+      await test.step("1. Spotlight search input element", async () => {
+        const searchInput = page.locator(WHATSAPP_LOCATORS.chatListSearchInput.primary).first();
+        await highlightElement(searchInput, 200);
+      });
+
+      let result!: SearchAndOpenResult;
+      await test.step(`2. Execute searchAndOpenGroup(page, '${targetGroupName}', 'yesterday')`, async () => {
+        result = await searchAndOpenGroup(page, targetGroupName, "yesterday");
+        await test.info().attach("search-and-open-result", {
+          body: JSON.stringify(result, null, 2),
+          contentType: "application/json",
+        });
+      });
+
+      await test.step(
+        `3. Validate open outcome -> Expected: status in ['opened', 'not_found'] | Received: { status: '${result?.status}', unreadCount: ${result?.unreadCount} }`,
+        async () => {
+          expect(result, "searchAndOpenGroup must return a defined result object").toBeDefined();
+          expect(
+            ["opened", "not_found"],
+            `Expected status 'opened' (or 'not_found' if absent), received '${result?.status}'`
+          ).toContain(result.status);
+
+          if (result.status === "opened") {
+            const header = page.locator(WHATSAPP_LOCATORS.conversationHeader.primary).first();
+            await highlightElement(header, 300);
+          }
+        }
+      );
+    });
+
+    test("Instantly returns 'opened' when group is already open with scope='yesterday'", async () => {
+      const { page, isAuthenticated, targetGroupName } = getContext();
+      test.skip(!isAuthenticated, "Requires authenticated WhatsApp session");
+
+      let alreadyOpenResult!: SearchAndOpenResult;
+      await test.step(`1. Execute searchAndOpenGroup(page, '${targetGroupName}', 'yesterday') on active chat`, async () => {
+        alreadyOpenResult = await searchAndOpenGroup(page, targetGroupName, "yesterday");
+        await test.info().attach("search-and-open-result", {
+          body: JSON.stringify(alreadyOpenResult, null, 2),
+          contentType: "application/json",
+        });
+      });
+
+      await test.step(
+        `2. Validate already-open optimization -> Expected: { status: 'opened', unreadCount: 0 } | Received: { status: '${alreadyOpenResult?.status}', unreadCount: ${alreadyOpenResult?.unreadCount} }`,
+        async () => {
+          expect(
+            alreadyOpenResult.status,
+            `Expected already open group to immediately return 'opened', received '${alreadyOpenResult?.status}'`
+          ).toBe("opened");
+          expect(
+            alreadyOpenResult.unreadCount,
+            `Already open group unread count must be 0, received ${alreadyOpenResult?.unreadCount}`
+          ).toBe(0);
+
+          const headerTitle = page.locator(WHATSAPP_LOCATORS.conversationChatTitle.primary).first();
+          await highlightElement(headerTitle, 300);
+        }
+      );
+    });
+  });
+}

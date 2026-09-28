@@ -1,8 +1,8 @@
 import { test, expect } from "@playwright/test";
-import { WHATSAPP_LOCATORS } from "../src/config/whatsapp_locators.js";
-import { validateLocatorWithFallback } from "./helpers/locator-tester.js";
-import { printDiagnosticReport, type LocatorValidationResult } from "./helpers/reporter-formatter.js";
-import { waitForWhatsAppLoadingToComplete } from "./helpers/page-ready.js";
+import { WHATSAPP_LOCATORS } from "../../src/config/whatsapp_locators.js";
+import { validateLocatorWithFallback } from "../helpers/locator-tester.js";
+import { printDiagnosticReport, type LocatorValidationResult } from "../helpers/reporter-formatter.js";
+import { waitForWhatsAppLoadingToComplete } from "../helpers/page-ready.js";
 
 test.describe("WhatsApp Authentication & Login Screen Locators", () => {
   const results: LocatorValidationResult[] = [];

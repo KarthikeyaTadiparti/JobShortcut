@@ -83,13 +83,6 @@ export async function clearActiveSearchInput(page: Page): Promise<void> {
 }
 
 /**
- * Backward-compatible alias for clearActiveSearchInput.
- */
-export async function clearSearchBox(page: Page): Promise<void> {
-    await clearActiveSearchInput(page);
-}
-
-/**
  * Switches WhatsApp Web navigation to the Chats tab if not already active.
  */
 export async function navigateToChatsTab(page: Page): Promise<void> {
@@ -368,142 +361,104 @@ export async function searchAndOpenGroup(
     try {
         await clearActiveSearchInput(page);
 
-        // 0. Check if group is already open in active conversation header (inside #main ONLY)
         const headerTitleSel = getCombinedSelector(WHATSAPP_LOCATORS.conversationChatTitle);
         const headerContainerSel = getCombinedSelector(WHATSAPP_LOCATORS.conversationHeader);
 
-        const alreadyOpen = await page.evaluate(({ targetName, titleSel, headerSel }) => {
-            const header = document.querySelector(titleSel) || document.querySelector(headerSel);
-            const text = header?.textContent?.trim() || "";
-            if (!text) return false;
-            const h = text.toLowerCase();
-            const t = targetName.toLowerCase().trim();
-            const prefix = t.replace(/\s*[-–(].*$/, '').trim();
-            return h === t || h.includes(t) || t.includes(h) || (prefix.length >= 3 && h.includes(prefix));
-        }, { targetName: groupName, titleSel: headerTitleSel, headerSel: headerContainerSel });
+        // 0. Check if the requested group is already open
+        const alreadyOpen = await page.evaluate(
+            ({ targetName, titleSel, headerSel }) => {
+                const titleEl = document.querySelector(titleSel);
+                const headerEl = document.querySelector(headerSel);
+                const titleText = (titleEl?.getAttribute("title") || titleEl?.textContent || "").trim().toLowerCase();
+                const headerText = (headerEl?.textContent || "").trim().toLowerCase();
+                const expected = targetName.trim().toLowerCase();
 
-        if (alreadyOpen && scope !== "unread") {
+                return titleText === expected || (!!titleText && titleText.includes(expected)) || (!!headerText && headerText.includes(expected));
+            },
+            { targetName: groupName, titleSel: headerTitleSel, headerSel: headerContainerSel }
+        );
+
+        if (alreadyOpen) {
+            if (scope === "unread") {
+                return { status: "skipped_no_unread", unreadCount: 0 };
+            }
             return { status: "opened", unreadCount: 0 };
         }
 
-        // 1. Locate search box strictly inside #side
+        // 1. Locate and focus search box
         const searchInputSel = getCombinedSelector(WHATSAPP_LOCATORS.chatListSearchInput);
         const searchBox = page.locator(searchInputSel).first();
-
         await searchBox.waitFor({ state: "visible", timeout: 8000 });
+        await searchBox.click({ force: true });
 
-        const searchTerms = getSearchCandidates(groupName);
+        // 2. Type search query
+        const charDelay = Math.floor(Math.random() * 35) + 35;
+        await page.keyboard.type(groupName, { delay: charDelay });
+        await randomJitter(800, 1500);
 
-        for (const searchTerm of searchTerms) {
-            await searchBox.click({ force: true });
-            await page.waitForTimeout(100);
-            await clearActiveSearchInput(page);
-            await page.waitForTimeout(100);
+        // 3. Inspect top matches (checking first 3 rows to avoid header/contact offsets)
+        const rowSel = getCombinedSelector(WHATSAPP_LOCATORS.chatListRow);
+        const titleSpanSel = getCombinedSelector(WHATSAPP_LOCATORS.chatRowTitle);
+        const unreadBadgeSel = getCombinedSelector(WHATSAPP_LOCATORS.chatRowUnreadBadge);
 
-            const charDelay = Math.floor(Math.random() * 35) + 35;
-            await page.keyboard.type(searchTerm, { delay: charDelay });
-            await randomJitter(800, 1500);
+        const matchInfo = await page.evaluate(
+            ({ targetName, rowSelector, titleSelector, badgeSelector }) => {
+                const rows = Array.from(document.querySelectorAll(rowSelector)).slice(0, 3);
+                const expected = targetName.trim().toLowerCase();
 
-            const paneSel = getCombinedSelector(WHATSAPP_LOCATORS.chatListContainer);
-            const rowSel = getCombinedSelector(WHATSAPP_LOCATORS.chatListRow);
-            const titleSpanSel = getCombinedSelector(WHATSAPP_LOCATORS.chatRowTitle);
-            const unreadBadgeSel = getCombinedSelector(WHATSAPP_LOCATORS.chatRowUnreadBadge);
-
-            const matchInfo = await page.evaluate(({ targetName, paneSelector, rowSelector, titleSelector, badgeSelector }) => {
-                const pane = document.querySelector(paneSelector);
-                if (!pane) return null;
-
-                const lowerTarget = targetName.toLowerCase().trim();
-                const prefix = lowerTarget.replace(/\s*[-–(].*$/, '').trim();
-                const rows = Array.from(pane.querySelectorAll(rowSelector));
-
-                for (const [i, row] of rows.entries()) {
+                for (let i = 0; i < rows.length; i++) {
+                    const row = rows[i];
                     if (!row) continue;
                     const titleSpan = row.querySelector(titleSelector);
-                    const title = (titleSpan?.getAttribute('title') || row.textContent || '').toLowerCase().trim();
+                    const actualName = (titleSpan?.getAttribute("title") || titleSpan?.textContent || "").trim().toLowerCase();
 
-                    if (
-                        title === lowerTarget ||
-                        title.includes(lowerTarget) ||
-                        lowerTarget.includes(title) ||
-                        (prefix.length >= 3 && title.includes(prefix))
-                    ) {
-                        let count = 0;
+                    if (actualName === expected || actualName.includes(expected)) {
+                        let unreadCount = 0;
                         const unreadEl = row.querySelector(badgeSelector);
                         if (unreadEl) {
-                            const label = unreadEl.getAttribute('aria-label') || unreadEl.textContent || '';
+                            const label = unreadEl.getAttribute("aria-label") || unreadEl.textContent || "";
                             const match = label.match(/\d+/);
-                            if (match) count = parseInt(match[0], 10);
+                            if (match) unreadCount = parseInt(match[0], 10);
                         }
-                        return { rowIndex: i, unreadCount: count };
+                        return { index: i, unreadCount };
                     }
                 }
                 return null;
-            }, {
-                targetName: groupName,
-                paneSelector: paneSel,
-                rowSelector: rowSel,
-                titleSelector: titleSpanSel,
-                badgeSelector: unreadBadgeSel,
-            });
+            },
+            { targetName: groupName, rowSelector: rowSel, titleSelector: titleSpanSel, badgeSelector: unreadBadgeSel }
+        );
 
-            if (!matchInfo) {
-                continue;
-            }
-
-            if (scope === "unread" && matchInfo.unreadCount === 0) {
-                await clearActiveSearchInput(page);
-                return { status: "skipped_no_unread", unreadCount: 0 };
-            }
-
-            const escaped = escapeRegex(searchTerm);
-            const chatRowLocator = page
-                .locator(rowSel)
-                .filter({ has: page.locator(titleSpanSel).filter({ hasText: new RegExp(escaped, 'i') }) })
-                .first();
-
-            if ((await chatRowLocator.count()) > 0) {
-                await chatRowLocator.click({ force: true }).catch(() => { });
-            } else {
-                const rowLocator = page.locator(rowSel).nth(matchInfo.rowIndex);
-                if ((await rowLocator.count()) > 0) {
-                    await rowLocator.click({ force: true }).catch(() => { });
-                } else {
-                    await page.keyboard.press("Enter");
-                }
-            }
-
-            const conversationPanelSel = getCombinedSelector(WHATSAPP_LOCATORS.conversationPanelMessages);
-            await page.waitForSelector(conversationPanelSel, {
-                state: "visible",
-                timeout: 6000,
-            }).catch(() => { });
-
-            const isNowOpen = await page.evaluate(({ targetName, titleSelector, headerSelector }) => {
-                const header = document.querySelector(titleSelector) || document.querySelector(headerSelector);
-                const text = header?.textContent?.trim() || "";
-                if (!text) {
-                    return !!document.querySelector('#main');
-                }
-                const h = text.toLowerCase();
-                const t = targetName.toLowerCase().trim();
-                const prefix = t.replace(/\s*[-–(].*$/, '').trim();
-                return h.includes(prefix) || prefix.includes(h) || h === t || h.includes(t) || t.includes(h);
-            }, { targetName: groupName, titleSelector: headerTitleSel, headerSelector: headerContainerSel });
-
-            if (isNowOpen) {
-                await page.locator(headerContainerSel).first().click({ force: true }).catch(() => { });
-                await page.hover(conversationPanelSel).catch(() => { });
-                await randomJitter(300, 600);
-                return { status: "opened", unreadCount: matchInfo.unreadCount };
-            }
+        // 4. If no matching row was found
+        if (!matchInfo) {
+            console.warn(`Group "${groupName}" was not found in top search results.`);
+            await clearActiveSearchInput(page);
+            return { status: "not_found", unreadCount: 0 };
         }
 
-        await clearActiveSearchInput(page);
-        console.warn(`Group '${groupName}' could not be found or opened from search results.`);
-        return { status: "not_found", unreadCount: 0 };
+        // 5. For unread scope, skip if unreadCount is 0
+        if (scope === "unread" && matchInfo.unreadCount === 0) {
+            await clearActiveSearchInput(page);
+            return { status: "skipped_no_unread", unreadCount: 0 };
+        }
+
+        // 6. Click matching row
+        const targetRow = page.locator(rowSel).nth(matchInfo.index);
+        await targetRow.click({ force: true });
+
+        // 7. Wait for conversation panel & settle
+        const conversationPanelSel = getCombinedSelector(WHATSAPP_LOCATORS.conversationPanelMessages);
+        await page.waitForSelector(conversationPanelSel, { state: "visible", timeout: 6000 }).catch(() => {});
+
+        await page.locator(headerContainerSel).first().click({ force: true }).catch(() => {});
+        await page.hover(conversationPanelSel).catch(() => {});
+        await randomJitter(300, 600);
+
+        return {
+            status: "opened",
+            unreadCount: matchInfo.unreadCount,
+        };
     } catch (error) {
-        console.warn(`Failed to search and open group '${groupName}':`, error);
+        console.warn(`Failed to search and open group "${groupName}":`, error);
         await clearActiveSearchInput(page);
         return { status: "not_found", unreadCount: 0 };
     }
@@ -873,19 +828,11 @@ export async function scrapeWhatsAppJobLinks(
     const startedAt = new Date().toISOString();
     const scope = options.scope || "unread";
 
-    // Resolve sources to scrape: priority to unified `sources`, fallback to legacy `groups`, or DEFAULT_WHATSAPP_SOURCES
+    // Resolve sources to scrape: priority to unified `sources`, or DEFAULT_WHATSAPP_SOURCES
     let sourcesToScrape: WhatsAppSourceConfig[];
 
     if (options.sources && options.sources.length > 0) {
         sourcesToScrape = options.sources.filter((s) => s.enabled !== false);
-    } else if (options.groups && options.groups.length > 0) {
-        sourcesToScrape = options.groups.filter((g) => g.enabled !== false).map((g) => ({
-            type: 'group' as const,
-            name: g.groupName,
-            targetDomain: g.targetDomain,
-            allowedDomains: g.allowedDomains,
-            enabled: g.enabled,
-        }));
     } else {
         sourcesToScrape = DEFAULT_WHATSAPP_SOURCES.filter((s) => s.enabled !== false);
     }

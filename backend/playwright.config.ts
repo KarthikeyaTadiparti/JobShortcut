@@ -47,16 +47,12 @@ export default defineConfig({
   },
   projects: [
     {
-      name: "auth-locators",
-      testMatch: /auth-locators\.spec\.ts/,
+      name: "locator",
+      testMatch: /locator\/.*\.spec\.ts/,
     },
     {
-      name: "chat-locators",
-      testMatch: /chat-locators\.spec\.ts/,
-    },
-    {
-      name: "channel-locators",
-      testMatch: /channel-locators\.spec\.ts/,
+      name: "logic",
+      testMatch: /logic\/.*\.spec\.ts/,
     },
   ],
 });

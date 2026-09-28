@@ -42,14 +42,14 @@ async function main() {
                         break;
                     case "source_complete":
                         if (event.result.status === "success") {
-                            console.log(`  ✓ Extracted ${event.result.extractedLinks.length} link(s):`);
+                            console.log(`  [SUCCESS] Extracted ${event.result.extractedLinks.length} link(s):`);
                             event.result.extractedLinks.forEach((l) => console.log(`     * ${l}`));
                         } else if (event.result.status === "skipped") {
-                            console.log(`  ○ Skipped: ${event.result.warning || "No unread messages"}`);
+                            console.log(`  [SKIPPED] ${event.result.warning || "No unread messages"}`);
                         } else if (event.result.status === "warning") {
-                            console.log(`  ⚠ Warning: ${event.result.warning}`);
+                            console.log(`  [WARNING] ${event.result.warning}`);
                         } else {
-                            console.log(`  ✗ Failed: ${event.result.error}`);
+                            console.log(`  [FAILED] ${event.result.error}`);
                         }
                         break;
                     case "done":

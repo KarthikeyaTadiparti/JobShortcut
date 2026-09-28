@@ -2,14 +2,14 @@ import { test, expect, chromium, type BrowserContext, type Page } from "@playwri
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
-import { WHATSAPP_LOCATORS } from "../src/config/whatsapp_locators.js";
-import { validateLocatorWithFallback } from "./helpers/locator-tester.js";
-import { printDiagnosticReport, type LocatorValidationResult } from "./helpers/reporter-formatter.js";
-import { waitForWhatsAppLoadingToComplete } from "./helpers/page-ready.js";
+import { WHATSAPP_LOCATORS } from "../../src/config/whatsapp_locators.js";
+import { validateLocatorWithFallback } from "../helpers/locator-tester.js";
+import { printDiagnosticReport, type LocatorValidationResult } from "../helpers/reporter-formatter.js";
+import { waitForWhatsAppLoadingToComplete } from "../helpers/page-ready.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const sessionDir = path.resolve(__dirname, "../.whatsapp_session");
+const sessionDir = path.resolve(__dirname, "../../.whatsapp_session");
 
 const TARGET_GROUP_NAME = "Jobcode 37";
 
@@ -61,23 +61,8 @@ test.describe("WhatsApp Authenticated Chat UI & Message Locators", () => {
         waitUntil: "domcontentloaded",
         timeout: 60000,
       });
-      // Wait for 'Loading your chats', progressbar, or initial splash overlay to finish
       await waitForWhatsAppLoadingToComplete(page, 45000);
     });
-
-    // Check session authentication status
-    const isChatListPresent = await page
-      .locator(WHATSAPP_LOCATORS.chatListContainer.primary)
-      .first()
-      .isVisible({ timeout: 5000 })
-      .catch(() => false);
-
-    if (!isChatListPresent) {
-      console.warn(
-        "\n⚠️ [Session Notice] Authenticated chat list not found in backend/.whatsapp_session.\n" +
-          "If this is a fresh setup, please scan the QR code using 'npm run scrape:whatsapp' or 'npm run test:locators:auth' first."
-      );
-    }
 
     // 1. Chat List Main Container
     const containerRes = await validateLocatorWithFallback(
