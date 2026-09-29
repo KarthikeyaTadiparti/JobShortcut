@@ -2,7 +2,7 @@ import { test, expect, chromium, type BrowserContext, type Page } from "@playwri
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
-import { WHATSAPP_LOCATORS } from "../../src/config/whatsapp_locators.js";
+import { WHATSAPP_LOCATORS, getCombinedSelector } from "../../src/config/whatsapp_locators.js";
 import { validateLocatorWithFallback } from "../helpers/locator-tester.js";
 import { printDiagnosticReport, type LocatorValidationResult } from "../helpers/reporter-formatter.js";
 import { waitForWhatsAppLoadingToComplete } from "../helpers/page-ready.js";
@@ -98,8 +98,8 @@ test.describe("WhatsApp Authenticated Chat UI & Message Locators", { tag: ["@loc
 
       // 5. Unread Badge (Optional - target row with unread count if available)
       const unreadRow = page
-        .locator('#pane-side [role="row"]')
-        .filter({ has: page.locator('[data-testid="icon-unread-count"], span[aria-label*="unread" i]') })
+        .locator(getCombinedSelector(WHATSAPP_LOCATORS.chatListRow))
+        .filter({ has: page.locator(getCombinedSelector(WHATSAPP_LOCATORS.chatRowUnreadBadge)) })
         .first();
 
       const hasUnreadRow = (await unreadRow.count()) > 0 && (await unreadRow.isVisible().catch(() => false));
@@ -137,11 +137,7 @@ test.describe("WhatsApp Authenticated Chat UI & Message Locators", { tag: ["@loc
     // Search and open the target group 'Jobcode 37'
     await test.step(`Search and open target group '${TARGET_GROUP_NAME}'`, async () => {
       // 1. Locate search box using active selector or fallback
-      const searchBox = page
-        .locator(
-          '#side div[data-testid="chat-list-search-container"] [contenteditable="true"], #side div[data-testid="chat-list-search-container"] input, #side [data-tab="3"], #side [role="textbox"]'
-        )
-        .first();
+      const searchBox = page.locator(getCombinedSelector(WHATSAPP_LOCATORS.chatListSearchInput)).first();
 
       if ((await searchBox.count()) > 0 && (await searchBox.isVisible({ timeout: 5000 }).catch(() => false))) {
         await searchBox.click({ force: true });
@@ -165,7 +161,7 @@ test.describe("WhatsApp Authenticated Chat UI & Message Locators", { tag: ["@loc
 
         // Click matching search result or press Enter
         const matchingRow = page
-          .locator('#pane-side [role="row"], [data-testid="chat-list"] [role="row"], [aria-label="Search results."] [role="row"]')
+          .locator(getCombinedSelector(WHATSAPP_LOCATORS.chatListRow))
           .filter({ hasText: new RegExp(TARGET_GROUP_NAME, "i") })
           .first();
 
@@ -178,7 +174,7 @@ test.describe("WhatsApp Authenticated Chat UI & Message Locators", { tag: ["@loc
         await page.waitForTimeout(2000);
       } else {
         // Fallback: click first row
-        const row = page.locator(WHATSAPP_LOCATORS.chatListRow.primary).first();
+        const row = page.locator(getCombinedSelector(WHATSAPP_LOCATORS.chatListRow)).first();
         if ((await row.count()) > 0 && (await row.isVisible({ timeout: 2000 }).catch(() => false))) {
           await row.click({ force: true }).catch(() => {});
           await page.waitForTimeout(1500);

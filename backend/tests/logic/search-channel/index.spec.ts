@@ -8,7 +8,7 @@ import { registerChannelTodayTests } from "./today.js";
 import { registerChannelYesterdayTests } from "./yesterday.js";
 import { registerChannelDefaultTests } from "./default.js";
 
-const KNOWN_CHANNEL_NAME = DEFAULT_WHATSAPP_CHANNELS[0]?.channelName || "Found The Job Alerts";
+const KNOWN_CHANNEL_NAME = DEFAULT_WHATSAPP_CHANNELS[0]?.channelName || "Freshershunt";
 
 test.describe("WhatsApp Channel Open Logic Test Suite", { tag: ["@logic", "@search-channel"] }, () => {
   let context: BrowserContext;

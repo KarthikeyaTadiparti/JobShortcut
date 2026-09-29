@@ -2,6 +2,7 @@ import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
 import { chromium, type BrowserContext, type Page } from "playwright";
+import { WHATSAPP_LOCATORS, getCombinedSelector } from "../config/whatsapp_locators.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -89,8 +90,8 @@ export interface WhatsAppAuthState {
  * Checks if the page is currently logged into WhatsApp Web or showing the QR code.
  */
 export async function checkWhatsAppAuthState(page: Page, timeoutMs = 25000): Promise<WhatsAppAuthState> {
-    const chatListSelector = '[data-testid="chat-list"], #pane-side, #side, [aria-label*="Chat list"], [aria-label*="Chats"]';
-    const qrCanvasSelector = 'canvas[aria-label*="Scan"], [data-testid="qrcode"], div[data-ref] canvas, canvas';
+    const chatListSelector = getCombinedSelector(WHATSAPP_LOCATORS.chatListContainer);
+    const qrCanvasSelector = getCombinedSelector(WHATSAPP_LOCATORS.qrCanvas);
 
     try {
         // First check if already on WhatsApp Web or need to navigate
@@ -141,7 +142,7 @@ export async function checkWhatsAppAuthState(page: Page, timeoutMs = 25000): Pro
  * Waits for the user to scan the QR code and log in.
  */
 export async function waitForWhatsAppLogin(page: Page, timeoutMs = 120000): Promise<boolean> {
-    const chatListSelector = '[data-testid="chat-list"], #pane-side, #side, [aria-label*="Chat list"], [aria-label*="Chats"]';
+    const chatListSelector = getCombinedSelector(WHATSAPP_LOCATORS.chatListContainer);
     try {
         await page.waitForSelector(chatListSelector, {
             state: "visible",

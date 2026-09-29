@@ -2,7 +2,8 @@ import { test, expect, chromium, type BrowserContext, type Page } from "@playwri
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
-import { WHATSAPP_LOCATORS } from "../../src/config/whatsapp_locators.js";
+import { WHATSAPP_LOCATORS, getCombinedSelector } from "../../src/config/whatsapp_locators.js";
+import { DEFAULT_WHATSAPP_CHANNELS } from "../../src/config/whatsapp-sources.js";
 import { validateLocatorWithFallback } from "../helpers/locator-tester.js";
 import { printDiagnosticReport, type LocatorValidationResult } from "../helpers/reporter-formatter.js";
 import { waitForWhatsAppLoadingToComplete } from "../helpers/page-ready.js";
@@ -10,6 +11,8 @@ import { waitForWhatsAppLoadingToComplete } from "../helpers/page-ready.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const sessionDir = path.resolve(__dirname, "../../.whatsapp_session");
+
+const TARGET_CHANNEL_NAME = DEFAULT_WHATSAPP_CHANNELS[0]?.channelName || "Freshershunt";
 
 test.describe("WhatsApp Channels UI & Broadcast Feed Locators", { tag: ["@locator", "@channel-locator"] }, () => {
   let context: BrowserContext;
@@ -53,7 +56,7 @@ test.describe("WhatsApp Channels UI & Broadcast Feed Locators", { tag: ["@locato
     }
   });
 
-  test("Validate Channels Tab Navigation & Broadcast Message Feed Locators", async () => {
+  test("Validate Left Pane Navigation, Channels List Scroll Area, and Channel Item Locators", async () => {
     test.setTimeout(120000);
     await test.step("Connect to WhatsApp Web and wait for session ready", async () => {
       await page.goto("https://web.whatsapp.com", {
@@ -78,7 +81,7 @@ test.describe("WhatsApp Channels UI & Broadcast Feed Locators", { tag: ["@locato
       });
     }
 
-    // 2. Validate Channels List Container
+    // 2. Validate Channels List Virtual Scroll Container (Left Section Scroll Area)
     const containerRes = await validateLocatorWithFallback(
       page,
       WHATSAPP_LOCATORS.channelsListContainer,
@@ -102,7 +105,7 @@ test.describe("WhatsApp Channels UI & Broadcast Feed Locators", { tag: ["@locato
     );
     results.push(rowRes.result);
 
-    // 5. Validate Channel Row Title & Unread Badge
+    // 5. Validate Channel Row Title
     if (rowRes.activeLocator) {
       const titleRes = await validateLocatorWithFallback(
         page,
@@ -115,32 +118,94 @@ test.describe("WhatsApp Channels UI & Broadcast Feed Locators", { tag: ["@locato
       );
       results.push(titleRes.result);
 
-      const unreadBadgeRes = await validateLocatorWithFallback(
-        page,
-        WHATSAPP_LOCATORS.channelRowUnreadBadge,
-        {
-          scopeLocator: rowRes.activeLocator,
-          timeoutMs: 3000,
-          highlightDurationMs: 300,
-        }
-      );
-      results.push(unreadBadgeRes.result);
+      // 6. Validate Channel Row Unread Badge (target row with unread count if available in viewport)
+      const unreadRow = page
+        .locator(getCombinedSelector(WHATSAPP_LOCATORS.channelListRow))
+        .filter({ has: page.locator(getCombinedSelector(WHATSAPP_LOCATORS.channelRowUnreadBadge)) })
+        .first();
+
+      const hasUnreadRow = (await unreadRow.count()) > 0 && (await unreadRow.isVisible().catch(() => false));
+      if (hasUnreadRow) {
+        const unreadBadgeRes = await validateLocatorWithFallback(
+          page,
+          WHATSAPP_LOCATORS.channelRowUnreadBadge,
+          {
+            scopeLocator: unreadRow,
+            timeoutMs: 4000,
+            highlightDurationMs: 400,
+          }
+        );
+        results.push(unreadBadgeRes.result);
+      } else {
+        results.push({
+          locatorId: WHATSAPP_LOCATORS.channelRowUnreadBadge.id,
+          locatorName: WHATSAPP_LOCATORS.channelRowUnreadBadge.name,
+          status: "SKIPPED",
+          workingSelector: null,
+          primaryPassed: false,
+          testedFallbacks: [],
+          executionTimeMs: 0,
+        });
+      }
+    } else {
+      results.push({
+        locatorId: WHATSAPP_LOCATORS.channelRowTitle.id,
+        locatorName: WHATSAPP_LOCATORS.channelRowTitle.name,
+        status: "SKIPPED",
+        workingSelector: null,
+        primaryPassed: false,
+        testedFallbacks: [],
+        executionTimeMs: 0,
+      });
+      results.push({
+        locatorId: WHATSAPP_LOCATORS.channelRowUnreadBadge.id,
+        locatorName: WHATSAPP_LOCATORS.channelRowUnreadBadge.name,
+        status: "SKIPPED",
+        workingSelector: null,
+        primaryPassed: false,
+        testedFallbacks: [],
+        executionTimeMs: 0,
+      });
     }
+  });
 
-    // 6. Select and Open a Target Channel
-    await test.step("Open target followed channel in conversation view", async () => {
-      const channelItem = page.locator(
-        '[data-testid="newsletter-tab-newsletter-cell"], [aria-label="Channel list"] [role="listitem"] [role="button"], div[aria-label*="Channel" i][role="button"], [aria-label="Channel list"] [role="listitem"], div[role="listitem"]'
-      ).first();
+  test(`Validate Channel Feed Pane, Header, Messages, and Right Section Scroll Area on '${TARGET_CHANNEL_NAME}'`, async () => {
+    test.setTimeout(120000);
+    // 7. Select and Open Target Channel
+    await test.step(`Search and open target followed channel '${TARGET_CHANNEL_NAME}' in conversation view`, async () => {
+      const searchBox = page.locator(getCombinedSelector(WHATSAPP_LOCATORS.channelsSearchInput)).first();
 
-      const isVisible = await channelItem.isVisible({ timeout: 5000 }).catch(() => false);
-      if (isVisible) {
-        await channelItem.click({ force: true }).catch(() => {});
-        await page.waitForTimeout(3000);
+      if ((await searchBox.count()) > 0 && (await searchBox.isVisible({ timeout: 5000 }).catch(() => false))) {
+        await searchBox.click({ force: true });
+        await page.waitForTimeout(200);
+
+        await page.keyboard.press("Control+A").catch(() => {});
+        await page.keyboard.press("Backspace").catch(() => {});
+
+        await page.keyboard.type(TARGET_CHANNEL_NAME, { delay: 50 });
+        await page.waitForTimeout(1500);
+
+        const matchingRow = page
+          .locator(getCombinedSelector(WHATSAPP_LOCATORS.channelListRow))
+          .filter({ hasText: new RegExp(TARGET_CHANNEL_NAME, "i") })
+          .first();
+
+        if ((await matchingRow.count()) > 0 && (await matchingRow.isVisible({ timeout: 4000 }).catch(() => false))) {
+          await matchingRow.click({ force: true });
+        } else {
+          await page.keyboard.press("Enter");
+        }
+        await page.waitForTimeout(2000);
+      } else {
+        const channelItem = page.locator(getCombinedSelector(WHATSAPP_LOCATORS.channelListRow)).first();
+        if ((await channelItem.count()) > 0 && (await channelItem.isVisible({ timeout: 4000 }).catch(() => false))) {
+          await channelItem.click({ force: true }).catch(() => {});
+          await page.waitForTimeout(2000);
+        }
       }
     });
 
-    // 7. Validate Channel Header in #main
+    // 8. Validate Channel Header in #main
     const headerRes = await validateLocatorWithFallback(
       page,
       WHATSAPP_LOCATORS.channelHeader,
@@ -148,7 +213,7 @@ test.describe("WhatsApp Channels UI & Broadcast Feed Locators", { tag: ["@locato
     );
     results.push(headerRes.result);
 
-    // 8. Validate Active Channel Title
+    // 9. Validate Active Channel Title
     const chatTitleRes = await validateLocatorWithFallback(
       page,
       WHATSAPP_LOCATORS.channelChatTitle,
@@ -156,7 +221,15 @@ test.describe("WhatsApp Channels UI & Broadcast Feed Locators", { tag: ["@locato
     );
     results.push(chatTitleRes.result);
 
-    // 9. Validate Channel Message Container
+    // 10. Validate Channel Feed Right Section Scroll Panel (Messages Scroll Container)
+    const scrollPanelRes = await validateLocatorWithFallback(
+      page,
+      WHATSAPP_LOCATORS.conversationPanelMessages,
+      { timeoutMs: 8000, highlightDurationMs: 400 }
+    );
+    results.push(scrollPanelRes.result);
+
+    // 11. Validate Channel Message Container
     const msgContainerRes = await validateLocatorWithFallback(
       page,
       WHATSAPP_LOCATORS.channelMessageContainer,
@@ -164,7 +237,7 @@ test.describe("WhatsApp Channels UI & Broadcast Feed Locators", { tag: ["@locato
     );
     results.push(msgContainerRes.result);
 
-    // 10. Validate Channel Message Text Content
+    // 12. Validate Channel Message Text Content
     const msgTextRes = await validateLocatorWithFallback(
       page,
       WHATSAPP_LOCATORS.channelCopyableText,
@@ -172,7 +245,7 @@ test.describe("WhatsApp Channels UI & Broadcast Feed Locators", { tag: ["@locato
     );
     results.push(msgTextRes.result);
 
-    // 11. Validate Channel Message Links
+    // 13. Validate Channel Message Links
     const msgLinkRes = await validateLocatorWithFallback(
       page,
       WHATSAPP_LOCATORS.channelMessageLink,

@@ -2,7 +2,7 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { chromium, type Page } from "playwright";
-import { WHATSAPP_LOCATORS } from "../config/whatsapp_locators.js";
+import { WHATSAPP_LOCATORS, getCombinedSelector } from "../config/whatsapp_locators.js";
 import { getDefaultWhatsAppSessionDir } from "../scraper/whatsapp_session.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -21,7 +21,7 @@ interface DomInspectionResult {
 
 async function waitForWhatsAppReady(page: Page, maxWaitMs = 45000): Promise<void> {
   try {
-    const loadingOverlay = page.locator('progress, [role="progressbar"], div[aria-label*="Loading"]');
+    const loadingOverlay = page.locator(getCombinedSelector(WHATSAPP_LOCATORS.loadingProgressBar));
     const isOverlay = await loadingOverlay.first().isVisible({ timeout: 3000 }).catch(() => false);
     if (isOverlay) {
       await loadingOverlay.first().waitFor({ state: "detached", timeout: maxWaitMs }).catch(() => {});
@@ -30,7 +30,14 @@ async function waitForWhatsAppReady(page: Page, maxWaitMs = 45000): Promise<void
     // ignore
   }
 
-  const readyLoc = page.locator('#pane-side, [data-testid="chat-list"], #main, canvas, div[data-ref], [data-icon="newsletter"]');
+  const readySelectors = [
+    getCombinedSelector(WHATSAPP_LOCATORS.chatListContainer),
+    getCombinedSelector(WHATSAPP_LOCATORS.conversationHeader),
+    getCombinedSelector(WHATSAPP_LOCATORS.qrCanvas),
+    getCombinedSelector(WHATSAPP_LOCATORS.channelsTabBtn),
+  ].join(", ");
+
+  const readyLoc = page.locator(readySelectors);
   await readyLoc.first().waitFor({ state: "visible", timeout: maxWaitMs }).catch(() => {});
   await page.waitForTimeout(2000);
 }
@@ -94,9 +101,7 @@ async function extractDomAndVerify(): Promise<void> {
 
     if (isChannelsMode) {
       console.log(`📺 Navigating to Channels / Updates tab...`);
-      const channelsTab = page.locator(
-        'button[aria-label="Channels"], button[aria-label="Updates"], [data-testid="menu-bar-chats-channels"], [data-icon="newsletter"]'
-      ).first();
+      const channelsTab = page.locator(getCombinedSelector(WHATSAPP_LOCATORS.channelsTabBtn)).first();
 
       if (await channelsTab.isVisible({ timeout: 5000 }).catch(() => false)) {
         await channelsTab.click();
@@ -105,9 +110,10 @@ async function extractDomAndVerify(): Promise<void> {
 
         // Click target channel
         console.log(`🔍 Locating and opening channel: "${targetChannel}"...`);
-        const channelItem = page.locator(
-          `button[aria-label*="${targetChannel}" i], [aria-label="Channel list"] button:has-text("${targetChannel}"), div[role="listitem"]:has-text("${targetChannel}"), button:has-text("${targetChannel}")`
-        ).first();
+        const channelItem = page
+          .locator(getCombinedSelector(WHATSAPP_LOCATORS.channelListRow))
+          .filter({ hasText: new RegExp(targetChannel || "", "i") })
+          .first();
 
         if (await channelItem.isVisible({ timeout: 4000 }).catch(() => false)) {
           await channelItem.click({ force: true });
@@ -115,7 +121,7 @@ async function extractDomAndVerify(): Promise<void> {
           await page.waitForTimeout(3000);
         } else {
           // Fall back to first channel
-          const firstChannel = page.locator('[aria-label="Channel list"] button, [role="listitem"] button').first();
+          const firstChannel = page.locator(getCombinedSelector(WHATSAPP_LOCATORS.channelListRow)).first();
           if (await firstChannel.isVisible({ timeout: 2000 }).catch(() => false)) {
             await firstChannel.click({ force: true });
             console.log(`✅ Clicked first available channel in list`);
@@ -127,9 +133,7 @@ async function extractDomAndVerify(): Promise<void> {
       console.log(`🔍 Searching and opening chat: "${targetGroup}"...`);
       try {
         const searchInput = page
-          .locator(
-            '#side div[data-testid="chat-list-search-container"] input, #side input[role="textbox"], #side [contenteditable="true"]'
-          )
+          .locator(getCombinedSelector(WHATSAPP_LOCATORS.chatListSearchInput))
           .first();
 
         if (await searchInput.isVisible({ timeout: 3000 }).catch(() => false)) {
@@ -138,8 +142,8 @@ async function extractDomAndVerify(): Promise<void> {
           await page.waitForTimeout(1500);
 
           const matchingRow = page
-            .locator('#pane-side [role="row"], [data-testid="chat-list"] [role="row"]')
-            .filter({ hasText: new RegExp(targetGroup, "i") })
+            .locator(getCombinedSelector(WHATSAPP_LOCATORS.chatListRow))
+            .filter({ hasText: new RegExp(targetGroup || "", "i") })
             .first();
 
           if (await matchingRow.isVisible({ timeout: 4000 }).catch(() => false)) {
@@ -160,7 +164,12 @@ async function extractDomAndVerify(): Promise<void> {
     console.log(`✅ Saved full DOM snapshot (${(fullHtml.length / 1024).toFixed(1)} KB) -> ${outputHtmlPath}`);
 
     // 2. Extract Scoped Side Pane (#side or Channel Drawer)
-    const sidePane = page.locator("#side, #pane-side, div[aria-label='Channel list']").first();
+    const sidePaneSelector = [
+      getCombinedSelector(WHATSAPP_LOCATORS.chatListContainer),
+      getCombinedSelector(WHATSAPP_LOCATORS.channelsListContainer),
+      "#side",
+    ].join(", ");
+    const sidePane = page.locator(sidePaneSelector).first();
     if (await sidePane.isVisible().catch(() => false)) {
       const sideHtml = await sidePane.evaluate((el) => el.outerHTML);
       fs.writeFileSync(outputSideHtmlPath, sideHtml, "utf-8");
@@ -168,11 +177,13 @@ async function extractDomAndVerify(): Promise<void> {
     }
 
     // 3. Extract Scoped Active Conversation Pane (#main)
-    const mainPane = page.locator("#main").first();
+    const mainPane = page.locator(getCombinedSelector(WHATSAPP_LOCATORS.conversationHeader)).first();
     if (await mainPane.isVisible().catch(() => false)) {
-      const mainHtml = await mainPane.evaluate((el) => el.outerHTML);
-      fs.writeFileSync(outputMainHtmlPath, mainHtml, "utf-8");
-      console.log(`✅ Saved Active Chat DOM (${(mainHtml.length / 1024).toFixed(1)} KB) -> ${outputMainHtmlPath}`);
+      const mainHtml = await page.locator("#main").evaluate((el) => el.outerHTML).catch(() => "");
+      if (mainHtml) {
+        fs.writeFileSync(outputMainHtmlPath, mainHtml, "utf-8");
+        console.log(`✅ Saved Active Chat DOM (${(mainHtml.length / 1024).toFixed(1)} KB) -> ${outputMainHtmlPath}`);
+      }
     }
 
     // 4. Verify all locators in WHATSAPP_LOCATORS against live DOM

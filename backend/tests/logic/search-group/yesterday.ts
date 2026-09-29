@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { searchAndOpenGroup, type SearchAndOpenResult } from "../../../src/scraper/whatsapp_scraper.js";
-import { WHATSAPP_LOCATORS } from "../../../src/config/whatsapp_locators.js";
+import { WHATSAPP_LOCATORS, getCombinedSelector } from "../../../src/config/whatsapp_locators.js";
 import { highlightElement } from "../../helpers/dom-highlighter.js";
 import type { TestContext } from "./unread.js";
 
@@ -16,7 +16,7 @@ export function registerYesterdayTests(getContext: () => TestContext): void {
       test.skip(!isAuthenticated, "Requires authenticated WhatsApp session");
 
       await test.step("1. Spotlight search box input", async () => {
-        const searchInput = page.locator(WHATSAPP_LOCATORS.chatListSearchInput.primary).first();
+        const searchInput = page.locator(getCombinedSelector(WHATSAPP_LOCATORS.chatListSearchInput)).first();
         await highlightElement(searchInput, 200);
       });
 
@@ -50,7 +50,7 @@ export function registerYesterdayTests(getContext: () => TestContext): void {
       test.skip(!isAuthenticated, "Requires authenticated WhatsApp session");
 
       await test.step("1. Spotlight search input element", async () => {
-        const searchInput = page.locator(WHATSAPP_LOCATORS.chatListSearchInput.primary).first();
+        const searchInput = page.locator(getCombinedSelector(WHATSAPP_LOCATORS.chatListSearchInput)).first();
         await highlightElement(searchInput, 200);
       });
 
@@ -73,7 +73,7 @@ export function registerYesterdayTests(getContext: () => TestContext): void {
           ).toContain(result.status);
 
           if (result.status === "opened") {
-            const header = page.locator(WHATSAPP_LOCATORS.conversationHeader.primary).first();
+            const header = page.locator(getCombinedSelector(WHATSAPP_LOCATORS.conversationHeader)).first();
             await highlightElement(header, 300);
           }
         }
@@ -105,7 +105,7 @@ export function registerYesterdayTests(getContext: () => TestContext): void {
             `Already open group unread count must be 0, received ${alreadyOpenResult?.unreadCount}`
           ).toBe(0);
 
-          const headerTitle = page.locator(WHATSAPP_LOCATORS.conversationChatTitle.primary).first();
+          const headerTitle = page.locator(getCombinedSelector(WHATSAPP_LOCATORS.conversationChatTitle)).first();
           await highlightElement(headerTitle, 300);
         }
       );

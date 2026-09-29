@@ -62,12 +62,6 @@ export const DEFAULT_WHATSAPP_GROUPS: WhatsAppGroupConfig[] = [
 
 export const DEFAULT_WHATSAPP_CHANNELS: WhatsAppChannelConfig[] = [
     {
-        channelName: 'Found The Job Alerts',
-        targetDomain: 'foundthejob.com',
-        allowedDomains: ['foundthejob.com'],
-        enabled: true,
-    },
-    {
         channelName: 'Freshershunt',
         targetDomain: 'freshershunt.in',
         allowedDomains: ['freshershunt.in'],

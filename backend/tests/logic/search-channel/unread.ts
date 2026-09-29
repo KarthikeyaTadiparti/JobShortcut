@@ -1,6 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { openFollowedChannel, type SearchAndOpenResult } from "../../../src/scraper/whatsapp_scraper.js";
-import { WHATSAPP_LOCATORS } from "../../../src/config/whatsapp_locators.js";
+import { WHATSAPP_LOCATORS, getCombinedSelector } from "../../../src/config/whatsapp_locators.js";
 import { highlightElement } from "../../helpers/dom-highlighter.js";
 
 const NON_EXISTENT_CHANNEL = "NonExistentChannel_TestXYZ_99999";
@@ -21,7 +21,7 @@ export function registerChannelUnreadTests(getContext: () => ChannelTestContext)
       test.skip(!isAuthenticated, "Requires authenticated WhatsApp session");
 
       await test.step("1. Spotlight channels search/filter input", async () => {
-        const searchInput = page.locator(WHATSAPP_LOCATORS.channelsSearchInput.primary).first();
+        const searchInput = page.locator(getCombinedSelector(WHATSAPP_LOCATORS.channelsSearchInput)).first();
         if ((await searchInput.count()) > 0 && (await searchInput.isVisible().catch(() => false))) {
           await highlightElement(searchInput, 200);
         }
@@ -61,7 +61,7 @@ export function registerChannelUnreadTests(getContext: () => ChannelTestContext)
         if (openRes.status !== "opened") {
           test.skip(true, `Could not open target channel '${targetChannelName}' to test unread skip behavior`);
         }
-        const header = page.locator(WHATSAPP_LOCATORS.channelHeader.primary).first();
+        const header = page.locator(getCombinedSelector(WHATSAPP_LOCATORS.channelHeader)).first();
         await highlightElement(header, 200);
       });
 

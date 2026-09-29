@@ -1,6 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { searchAndOpenGroup, type SearchAndOpenResult } from "../../../src/scraper/whatsapp_scraper.js";
-import { WHATSAPP_LOCATORS } from "../../../src/config/whatsapp_locators.js";
+import { WHATSAPP_LOCATORS, getCombinedSelector } from "../../../src/config/whatsapp_locators.js";
 import { highlightElement } from "../../helpers/dom-highlighter.js";
 
 const NON_EXISTENT_GROUP = "NonExistentGroup_TestXYZ_99999";
@@ -21,7 +21,7 @@ export function registerUnreadTests(getContext: () => TestContext): void {
       test.skip(!isAuthenticated, "Requires authenticated WhatsApp session");
 
       await test.step("1. Spotlight search box input", async () => {
-        const searchInput = page.locator(WHATSAPP_LOCATORS.chatListSearchInput.primary).first();
+        const searchInput = page.locator(getCombinedSelector(WHATSAPP_LOCATORS.chatListSearchInput)).first();
         await highlightElement(searchInput, 200);
       });
 
@@ -59,7 +59,7 @@ export function registerUnreadTests(getContext: () => TestContext): void {
         if (openRes.status !== "opened") {
           test.skip(true, `Could not open target group '${targetGroupName}' to test unread skip behavior`);
         }
-        const header = page.locator(WHATSAPP_LOCATORS.conversationHeader.primary).first();
+        const header = page.locator(getCombinedSelector(WHATSAPP_LOCATORS.conversationHeader)).first();
         await highlightElement(header, 200);
       });
 
@@ -93,7 +93,7 @@ export function registerUnreadTests(getContext: () => TestContext): void {
       test.skip(!isAuthenticated, "Requires authenticated WhatsApp session");
 
       await test.step("1. Spotlight search box input", async () => {
-        const searchInput = page.locator(WHATSAPP_LOCATORS.chatListSearchInput.primary).first();
+        const searchInput = page.locator(getCombinedSelector(WHATSAPP_LOCATORS.chatListSearchInput)).first();
         await highlightElement(searchInput, 200);
       });
 

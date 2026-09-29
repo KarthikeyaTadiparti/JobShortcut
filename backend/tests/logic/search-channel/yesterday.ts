@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { openFollowedChannel, type SearchAndOpenResult } from "../../../src/scraper/whatsapp_scraper.js";
-import { WHATSAPP_LOCATORS } from "../../../src/config/whatsapp_locators.js";
+import { WHATSAPP_LOCATORS, getCombinedSelector } from "../../../src/config/whatsapp_locators.js";
 import { highlightElement } from "../../helpers/dom-highlighter.js";
 import type { ChannelTestContext } from "./unread.js";
 
@@ -16,7 +16,7 @@ export function registerChannelYesterdayTests(getContext: () => ChannelTestConte
       test.skip(!isAuthenticated, "Requires authenticated WhatsApp session");
 
       await test.step("1. Spotlight channels search input", async () => {
-        const searchInput = page.locator(WHATSAPP_LOCATORS.channelsSearchInput.primary).first();
+        const searchInput = page.locator(getCombinedSelector(WHATSAPP_LOCATORS.channelsSearchInput)).first();
         if ((await searchInput.count()) > 0 && (await searchInput.isVisible().catch(() => false))) {
           await highlightElement(searchInput, 200);
         }
@@ -70,7 +70,7 @@ export function registerChannelYesterdayTests(getContext: () => ChannelTestConte
           ).toContain(result.status);
 
           if (result.status === "opened") {
-            const header = page.locator(WHATSAPP_LOCATORS.channelHeader.primary).first();
+            const header = page.locator(getCombinedSelector(WHATSAPP_LOCATORS.channelHeader)).first();
             await highlightElement(header, 300);
           }
         }
@@ -109,7 +109,7 @@ export function registerChannelYesterdayTests(getContext: () => ChannelTestConte
             `Already open channel unread count must be 0, received ${alreadyOpenResult?.unreadCount}`
           ).toBe(0);
 
-          const headerTitle = page.locator(WHATSAPP_LOCATORS.channelChatTitle.primary).first();
+          const headerTitle = page.locator(getCombinedSelector(WHATSAPP_LOCATORS.channelChatTitle)).first();
           if ((await headerTitle.count()) > 0 && (await headerTitle.isVisible().catch(() => false))) {
             await highlightElement(headerTitle, 300);
           }
