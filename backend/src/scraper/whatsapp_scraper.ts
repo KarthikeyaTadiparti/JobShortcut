@@ -343,6 +343,20 @@ export function getSearchCandidates(name: string): string[] {
         candidates.push(noBrackets);
     }
 
+    const noPrefixNumber = noBrackets.replace(/^\d+\s*[-–]\s*/, '').trim();
+    if (noPrefixNumber && noPrefixNumber.length >= 3 && !candidates.includes(noPrefixNumber)) {
+        candidates.push(noPrefixNumber);
+    }
+
+    const cleanCore = noPrefixNumber
+        .replace(/\.(in|com|site|org|net|co\.in)\b/gi, '')
+        .split(/[-–|]/)[0]
+        ?.replace(/\s+(jobs|alerts|updates|group|openings|batch|community)\b.*$/i, '')
+        .trim();
+    if (cleanCore && cleanCore.length >= 3 && !candidates.includes(cleanCore)) {
+        candidates.push(cleanCore);
+    }
+
     const noSuffix = noBrackets
         .replace(/\s*[-–]\s*\d+.*$/, '')
         .replace(/\s+(jobs|alerts|updates|group|openings|batch|community)\b.*$/i, '')
@@ -395,75 +409,135 @@ export async function searchAndOpenGroup(
             return { status: "opened", unreadCount: 0 };
         }
 
-        // 1. Locate and focus search box
-        const searchInputSel = getCombinedSelector(WHATSAPP_LOCATORS.chatListSearchInput);
-        const searchBox = page.locator(searchInputSel).first();
-        await searchBox.waitFor({ state: "visible", timeout: 8000 });
-        await searchBox.click({ force: true });
-
-        // 2. Type search query
-        const charDelay = Math.floor(Math.random() * 35) + 35;
-        await page.keyboard.type(groupName, { delay: charDelay });
-        await randomJitter(800, 1500);
-
-        // 3. Inspect top matches (checking first 3 rows to avoid header/contact offsets)
+        const candidates = getSearchCandidates(groupName);
         const rowSel = getCombinedSelector(WHATSAPP_LOCATORS.chatListRow);
         const titleSpanSel = getCombinedSelector(WHATSAPP_LOCATORS.chatRowTitle);
         const unreadBadgeSel = getCombinedSelector(WHATSAPP_LOCATORS.chatRowUnreadBadge);
+        const searchInputSel = getCombinedSelector(WHATSAPP_LOCATORS.chatListSearchInput);
 
-        const matchInfo = await page.evaluate(
-            ({ targetName, rowSelector, titleSelector, badgeSelector }) => {
-                const rows = Array.from(document.querySelectorAll(rowSelector)).slice(0, 3);
-                const expected = targetName.trim().toLowerCase();
+        for (const query of candidates) {
+            // 1. Locate and focus search box
+            await clearActiveSearchInput(page);
+            const searchBox = page.locator(searchInputSel).first();
+            await searchBox.waitFor({ state: "visible", timeout: 8000 });
+            await searchBox.click({ force: true });
 
-                for (let i = 0; i < rows.length; i++) {
-                    const row = rows[i];
-                    if (!row) continue;
-                    const titleSpan = row.querySelector(titleSelector);
-                    const actualName = (titleSpan?.getAttribute("title") || titleSpan?.textContent || "").trim().toLowerCase();
+            // 2. Type search query
+            const charDelay = Math.floor(Math.random() * 25) + 25;
+            await page.keyboard.type(query, { delay: charDelay });
+            await randomJitter(800, 1200);
 
-                    if (actualName === expected || actualName.includes(expected)) {
-                        let unreadCount = 0;
-                        const unreadEl = row.querySelector(badgeSelector);
-                        if (unreadEl) {
-                            const label = unreadEl.getAttribute("aria-label") || unreadEl.textContent || "";
-                            const match = label.match(/\d+/);
-                            if (match) unreadCount = parseInt(match[0], 10);
+            // 3. Wait for search results matching target or candidate queries to render in the DOM
+            await page.waitForFunction(
+                ({ targetName, candidateQueries, rowSelector, titleSelector }) => {
+                    const rows = Array.from(document.querySelectorAll(rowSelector));
+                    const normalize = (str: string) => str.replace(/[\u2013\u2014]/g, "-").replace(/\s+/g, " ").trim().toLowerCase();
+                    const expected = normalize(targetName);
+                    const expectedQueries = candidateQueries.map(normalize);
+
+                    for (let i = 0; i < Math.min(rows.length, 30); i++) {
+                        const row = rows[i] as HTMLElement;
+                        if (!row) continue;
+                        const titleSpan = row.querySelector(titleSelector);
+                        const titleText = normalize(titleSpan?.getAttribute("title") || titleSpan?.textContent || "");
+                        const rowText = normalize(row.getAttribute("title") || row.textContent || "");
+                        const actualName = titleText || rowText;
+
+                        if (
+                            actualName === expected ||
+                            actualName.includes(expected) ||
+                            (titleText.length > 2 && expected.includes(titleText)) ||
+                            expectedQueries.some((q) => q.length >= 3 && (actualName.includes(q) || titleText.includes(q)))
+                        ) {
+                            return true;
                         }
-                        return { index: i, unreadCount };
                     }
+                    return false;
+                },
+                {
+                    targetName: groupName,
+                    candidateQueries: candidates,
+                    rowSelector: rowSel,
+                    titleSelector: titleSpanSel,
+                },
+                { timeout: 3500 }
+            ).catch(() => false);
+
+            // 4. Inspect matches across all search result rows and retrieve matching row index
+            const matchInfo = await page.evaluate(
+                ({ targetName, candidateQueries, rowSelector, titleSelector, badgeSelector }) => {
+                    const rows = Array.from(document.querySelectorAll(rowSelector));
+                    const normalize = (str: string) => str.replace(/[\u2013\u2014]/g, "-").replace(/\s+/g, " ").trim().toLowerCase();
+                    const expected = normalize(targetName);
+                    const expectedQueries = candidateQueries.map(normalize);
+
+                    for (let i = 0; i < Math.min(rows.length, 30); i++) {
+                        const row = rows[i] as HTMLElement;
+                        if (!row) continue;
+
+                        const titleSpan = row.querySelector(titleSelector);
+                        const titleText = normalize(titleSpan?.getAttribute("title") || titleSpan?.textContent || "");
+                        const rowText = normalize(row.getAttribute("title") || row.textContent || "");
+                        const actualName = titleText || rowText;
+
+                        const isMatch =
+                            actualName === expected ||
+                            actualName.includes(expected) ||
+                            (titleText.length > 2 && expected.includes(titleText)) ||
+                            expectedQueries.some((q) => q.length >= 3 && (actualName.includes(q) || titleText.includes(q)));
+
+                        if (isMatch) {
+                            let unreadCount = 0;
+                            const unreadEl = row.querySelector(badgeSelector);
+                            if (unreadEl) {
+                                const label = unreadEl.getAttribute("aria-label") || unreadEl.textContent || "";
+                                const match = label.match(/\d+/);
+                                if (match) unreadCount = parseInt(match[0], 10);
+                            }
+                            row.click();
+                            return { matched: true, unreadCount, index: i };
+                        }
+                    }
+                    return null;
+                },
+                {
+                    targetName: groupName,
+                    candidateQueries: candidates,
+                    rowSelector: rowSel,
+                    titleSelector: titleSpanSel,
+                    badgeSelector: unreadBadgeSel,
                 }
-                return null;
-            },
-            { targetName: groupName, rowSelector: rowSel, titleSelector: titleSpanSel, badgeSelector: unreadBadgeSel }
-        );
+            );
 
-        // 4. If no matching row was found
-        if (!matchInfo) {
-            console.warn(`Group "${groupName}" was not found in top search results.`);
-            await clearActiveSearchInput(page);
-            return { status: "not_found", unreadCount: 0 };
+            if (matchInfo && matchInfo.matched) {
+                // 5. For unread scope, skip if unreadCount is 0
+                if (scope === "unread" && matchInfo.unreadCount === 0) {
+                    await clearActiveSearchInput(page);
+                    return { status: "skipped_no_unread", unreadCount: 0 };
+                }
+
+                // 6. Click target row via Playwright to ensure synthetic and native pointer events
+                const matchingRows = page.locator(rowSel);
+                if ((await matchingRows.count()) > matchInfo.index) {
+                    await matchingRows.nth(matchInfo.index).click({ force: true }).catch(() => {});
+                }
+
+                // 7. Wait for conversation panel & settle
+                const conversationPanelSel = getCombinedSelector(WHATSAPP_LOCATORS.conversationPanelMessages);
+                await page.waitForSelector(conversationPanelSel, { state: "visible", timeout: 8000 }).catch(() => {});
+                await clearActiveSearchInput(page);
+                await randomJitter(400, 700);
+
+                return {
+                    status: "opened",
+                    unreadCount: matchInfo.unreadCount,
+                };
+            }
         }
 
-        // 5. For unread scope, skip if unreadCount is 0
-        if (scope === "unread" && matchInfo.unreadCount === 0) {
-            await clearActiveSearchInput(page);
-            return { status: "skipped_no_unread", unreadCount: 0 };
-        }
-
-        // 6. Click matching row
-        const targetRow = page.locator(rowSel).nth(matchInfo.index);
-        await targetRow.click({ force: true });
-
-        // 7. Wait for conversation panel & settle
-        const conversationPanelSel = getCombinedSelector(WHATSAPP_LOCATORS.conversationPanelMessages);
-        await page.waitForSelector(conversationPanelSel, { state: "visible", timeout: 6000 }).catch(() => {});
-        await randomJitter(300, 600);
-
-        return {
-            status: "opened",
-            unreadCount: matchInfo.unreadCount,
-        };
+        console.warn(`Group "${groupName}" was not found in top search results.`);
+        await clearActiveSearchInput(page);
+        return { status: "not_found", unreadCount: 0 };
     } catch (error) {
         console.warn(`Failed to search and open group "${groupName}":`, error);
         await clearActiveSearchInput(page);
