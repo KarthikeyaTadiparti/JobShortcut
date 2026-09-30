@@ -277,7 +277,7 @@ export const WHATSAPP_LOCATORS: Record<LocatorKey, LocatorDefinition> = {
     primary: "#main header",
     fallbacks: [
       '#main [data-testid="conversation-header"]',
-      "#main",
+      '#main header[data-testid="conversation-header"]',
     ],
     requiresParent: "#main",
   },
@@ -511,7 +511,7 @@ export const WHATSAPP_LOCATORS: Record<LocatorKey, LocatorDefinition> = {
     primary: '#main header, div[data-testid="conversation-header"]',
     fallbacks: [
       '#main [data-testid="conversation-header"]',
-      "#main",
+      '#main header[data-testid="conversation-header"]',
     ],
   },
   channelChatTitle: {

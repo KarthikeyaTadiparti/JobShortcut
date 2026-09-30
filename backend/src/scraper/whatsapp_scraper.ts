@@ -38,17 +38,35 @@ export async function randomJitter(minMs = 300, maxMs = 700): Promise<void> {
 
 /**
  * Ensures any active search or filter input state is cleanly sanitized and reset prior to typing.
- * Handles overlays, cancel buttons, and clears both input and contenteditable search boxes.
+ * Handles React controlled inputs, clear buttons, and contenteditable boxes without triggering global view dismissals.
  */
 export async function clearActiveSearchInput(page: Page): Promise<void> {
     try {
-        // 1. Press Escape to dismiss active search popups, overlays, or reset focus
-        await page.keyboard.press("Escape").catch(() => { });
-        await randomJitter(150, 250);
+        const searchInputSelector = `${getCombinedSelector(WHATSAPP_LOCATORS.chatListSearchInput)}, ${getCombinedSelector(WHATSAPP_LOCATORS.channelsSearchInput)}`;
 
-        // 2. Locate and click any search clear / cancel button from WHATSAPP_LOCATORS
+        // 1. Clear any active search input element via React-compatible native property setter
+        await page.evaluate((selector) => {
+            const inputs = document.querySelectorAll(selector);
+            const nativeSetter = Object.getOwnPropertyDescriptor(
+                window.HTMLInputElement.prototype,
+                'value'
+            )?.set;
+
+            for (const input of Array.from(inputs)) {
+                const el = input as HTMLElement;
+                if (nativeSetter && 'value' in el) {
+                    nativeSetter.call(el, '');
+                } else if ('value' in el) {
+                    (el as HTMLInputElement).value = '';
+                }
+                el.textContent = '';
+                el.dispatchEvent(new Event('input', { bubbles: true }));
+                el.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+        }, searchInputSelector).catch(() => false);
+
+        // 2. Locate and click any search clear / cancel button inside the search container
         const clearBtnSelectors = getLocatorSelectors(WHATSAPP_LOCATORS.chatListSearchClearBtn);
-
         for (const sel of clearBtnSelectors) {
             const btn = page.locator(sel).first();
             if ((await btn.count()) > 0 && (await btn.isVisible().catch(() => false))) {
@@ -58,25 +76,17 @@ export async function clearActiveSearchInput(page: Page): Promise<void> {
             }
         }
 
-        // 3. Clear any active search input element via DOM manipulation and keyboard fallback
-        const searchInputSelector = getCombinedSelector(WHATSAPP_LOCATORS.chatListSearchInput);
-        await page.evaluate((selector) => {
-            const inputs = document.querySelectorAll(selector);
-            for (const input of Array.from(inputs)) {
-                const el = input as HTMLElement;
-                if ('value' in el) {
-                    (el as HTMLInputElement).value = '';
-                } else {
-                    el.textContent = '';
-                }
-                el.dispatchEvent(new Event('input', { bubbles: true }));
-                el.dispatchEvent(new Event('change', { bubbles: true }));
+        // 3. Fallback: If search input is visible and still contains text, select all and backspace
+        const inputLoc = page.locator(searchInputSelector).first();
+        if ((await inputLoc.count()) > 0 && (await inputLoc.isVisible().catch(() => false))) {
+            const currentVal = await inputLoc.inputValue().catch(() => "");
+            if (currentVal && currentVal.length > 0) {
+                await inputLoc.focus().catch(() => {});
+                await page.keyboard.press("ControlOrMeta+A").catch(() => {});
+                await page.keyboard.press("Backspace").catch(() => {});
+                await page.waitForTimeout(100);
             }
-        }, searchInputSelector).catch(() => { });
-
-        // 4. Secondary escape press to ensure state settles
-        await page.keyboard.press("Escape").catch(() => { });
-        await page.waitForTimeout(100);
+        }
     } catch {
         // Non-fatal sanitization error
     }
@@ -448,9 +458,6 @@ export async function searchAndOpenGroup(
         // 7. Wait for conversation panel & settle
         const conversationPanelSel = getCombinedSelector(WHATSAPP_LOCATORS.conversationPanelMessages);
         await page.waitForSelector(conversationPanelSel, { state: "visible", timeout: 6000 }).catch(() => {});
-
-        await page.locator(headerContainerSel).first().click({ force: true }).catch(() => {});
-        await page.hover(conversationPanelSel).catch(() => {});
         await randomJitter(300, 600);
 
         return {
@@ -473,8 +480,6 @@ export async function openFollowedChannel(
     scope?: ExtractionScope
 ): Promise<SearchAndOpenResult> {
     try {
-        await clearActiveSearchInput(page);
-
         // 0. Check if channel is already active in #main
         const channelChatTitleSel = getCombinedSelector(WHATSAPP_LOCATORS.channelChatTitle);
         const channelHeaderSel = getCombinedSelector(WHATSAPP_LOCATORS.channelHeader);
@@ -501,6 +506,7 @@ export async function openFollowedChannel(
 
         // Ensure Channels view is active
         await navigateToChannelsTab(page);
+        await clearActiveSearchInput(page);
 
         const channelRowSel = getCombinedSelector(WHATSAPP_LOCATORS.channelListRow);
         const channelTitleSel = getCombinedSelector(WHATSAPP_LOCATORS.channelRowTitle);
@@ -554,9 +560,6 @@ export async function openFollowedChannel(
                 state: "visible",
                 timeout: 8000,
             }).catch(() => { });
-
-            await page.locator(channelHeaderSel).first().click({ force: true }).catch(() => { });
-            await page.hover('#main').catch(() => { });
             await randomJitter(300, 600);
 
             return { status: "opened", unreadCount: matchInfo.unreadCount };
@@ -568,6 +571,8 @@ export async function openFollowedChannel(
 
         if ((await channelSearchInput.count()) > 0 && (await channelSearchInput.isVisible().catch(() => false))) {
             await channelSearchInput.click({ force: true });
+            await page.keyboard.press("ControlOrMeta+A").catch(() => {});
+            await page.keyboard.press("Backspace").catch(() => {});
             await page.keyboard.type(channelName, { delay: 40 });
             await randomJitter(600, 1000);
 
@@ -609,7 +614,6 @@ export async function openFollowedChannel(
 
                 const messageContainerSel = getCombinedSelector(WHATSAPP_LOCATORS.channelMessageContainer);
                 await page.waitForSelector(messageContainerSel, { state: "visible", timeout: 8000 }).catch(() => { });
-                await page.locator(channelHeaderSel).first().click({ force: true }).catch(() => { });
                 await randomJitter(300, 600);
 
                 return { status: "opened", unreadCount: searchMatch.unreadCount };
