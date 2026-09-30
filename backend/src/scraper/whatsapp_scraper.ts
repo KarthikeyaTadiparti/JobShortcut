@@ -1473,8 +1473,3 @@ export async function scrapeWhatsAppJobLinks(
         await context.close().catch(() => { });
     }
 }
-
-/**
- * Named alias for scrapeWhatsAppJobLinks.
- */
-export const scrapeWhatsAppLinks = scrapeWhatsAppJobLinks;
