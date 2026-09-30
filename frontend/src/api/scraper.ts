@@ -78,10 +78,6 @@ export interface SourceScrapeResult {
   error?: string;
 }
 
-export interface GroupScrapeResult extends SourceScrapeResult {
-  groupName: string;
-}
-
 export interface WhatsAppImportResult {
   success: boolean;
   scope: ExtractionScope;
@@ -94,7 +90,6 @@ export interface WhatsAppImportResult {
   skippedSources: number;
   failedSources: number;
   sourceResults: SourceScrapeResult[];
-  groupResults?: GroupScrapeResult[];
   urls: string[];
   totalUrls: number;
   startedAt: string;
@@ -109,9 +104,6 @@ export interface WhatsAppScrapeCallbacks {
   onSourceStart?: (sourceType: WhatsAppSourceType, sourceName: string, targetDomain: string, index: number, total: number) => void;
   onSourceProgress?: (sourceType: WhatsAppSourceType, sourceName: string, message: string, unreadCount?: number) => void;
   onSourceComplete?: (sourceType: WhatsAppSourceType, sourceName: string, result: SourceScrapeResult) => void;
-  onGroupStart?: (groupName: string, targetDomain: string, index: number, total: number) => void;
-  onGroupProgress?: (groupName: string, message: string, unreadCount?: number) => void;
-  onGroupComplete?: (groupName: string, result: GroupScrapeResult) => void;
   onDone?: (result: WhatsAppImportResult) => void;
   onError?: (message: string) => void;
 }
@@ -193,24 +185,6 @@ export async function startWhatsAppScraperStream(
               break;
             case 'source_complete':
               callbacks.onSourceComplete?.(eventData.sourceType, eventData.sourceName, eventData.result);
-              break;
-            case 'group_start':
-              callbacks.onGroupStart?.(
-                eventData.groupName,
-                eventData.targetDomain,
-                eventData.index,
-                eventData.total
-              );
-              break;
-            case 'group_progress':
-              callbacks.onGroupProgress?.(
-                eventData.groupName,
-                eventData.message,
-                eventData.unreadCount
-              );
-              break;
-            case 'group_complete':
-              callbacks.onGroupComplete?.(eventData.groupName, eventData.result);
               break;
             case 'done':
               callbacks.onDone?.(eventData.result);

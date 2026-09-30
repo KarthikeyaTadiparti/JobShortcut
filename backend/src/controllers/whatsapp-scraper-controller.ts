@@ -9,13 +9,12 @@ import {
 import {
     ExtractionScope,
     type WhatsAppSourceConfig,
-    type WhatsAppGroupConfig,
     type WhatsAppScrapeOptions,
 } from "../scraper/whatsapp-types.js";
 
 /**
  * Controller to handle WhatsApp scraper requests with real-time SSE streaming.
- * Supports unified sources (groups & channels) as well as legacy groups format.
+ * Supports unified sources (groups & channels).
  */
 export const handleWhatsAppScrape = wrapAsync(async (req: Request, res: Response) => {
     const rawScope = req.body.scope;
@@ -26,7 +25,6 @@ export const handleWhatsAppScrape = wrapAsync(async (req: Request, res: Response
             ? ExtractionScope.YESTERDAY
             : ExtractionScope.UNREAD;
     const sources: WhatsAppSourceConfig[] | undefined = req.body.sources;
-    const groups: WhatsAppGroupConfig[] | undefined = req.body.groups;
     const headless: boolean | undefined = req.body.headless;
 
     // Set up SSE stream
@@ -42,7 +40,6 @@ export const handleWhatsAppScrape = wrapAsync(async (req: Request, res: Response
     const scrapeOptions: WhatsAppScrapeOptions = {
         scope,
         sources,
-        groups,
         headless,
         signal: abortController.signal,
     };

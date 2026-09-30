@@ -23,7 +23,6 @@ import {
     type WhatsAppScrapeOptions,
     type WhatsAppImportResult,
     type SourceScrapeResult,
-    type GroupScrapeResult,
     type WhatsAppSSEEvent,
     type WhatsAppEventCallback,
 } from "./whatsapp-types.js";
@@ -1074,7 +1073,7 @@ export async function scrapeWhatsAppJobLinks(
 
             currentIndex++;
 
-            // Emit unified source_start and backward-compatible group_start
+            // Emit unified source_start
             emit({
                 type: "source_start",
                 sourceType: source.type,
@@ -1083,16 +1082,6 @@ export async function scrapeWhatsAppJobLinks(
                 index: currentIndex,
                 total: sourcesToScrape.length,
             });
-
-            if (source.type === "group") {
-                emit({
-                    type: "group_start",
-                    groupName: source.name,
-                    targetDomain: source.targetDomain,
-                    index: currentIndex,
-                    total: sourcesToScrape.length,
-                });
-            }
 
             try {
                 if (source.type === "group") {
@@ -1103,11 +1092,6 @@ export async function scrapeWhatsAppJobLinks(
                         type: "source_progress",
                         sourceType: "group",
                         sourceName: source.name,
-                        message: `Searching for group '${source.name}'...`,
-                    });
-                    emit({
-                        type: "group_progress",
-                        groupName: source.name,
                         message: `Searching for group '${source.name}'...`,
                     });
 
@@ -1131,11 +1115,6 @@ export async function scrapeWhatsAppJobLinks(
                             sourceName: source.name,
                             result: skipResult,
                         });
-                        emit({
-                            type: "group_complete",
-                            groupName: source.name,
-                            result: { ...skipResult, groupName: source.name },
-                        });
                         continue;
                     }
 
@@ -1156,11 +1135,6 @@ export async function scrapeWhatsAppJobLinks(
                             sourceName: source.name,
                             result: notFoundResult,
                         });
-                        emit({
-                            type: "group_complete",
-                            groupName: source.name,
-                            result: { ...notFoundResult, groupName: source.name },
-                        });
                         continue;
                     }
 
@@ -1174,12 +1148,6 @@ export async function scrapeWhatsAppJobLinks(
                         type: "source_progress",
                         sourceType: "group",
                         sourceName: source.name,
-                        message: "Harvesting messages across scope history...",
-                        unreadCount: scope === "unread" ? unreadCount : undefined,
-                    });
-                    emit({
-                        type: "group_progress",
-                        groupName: source.name,
                         message: "Harvesting messages across scope history...",
                         unreadCount: scope === "unread" ? unreadCount : undefined,
                     });
@@ -1204,11 +1172,6 @@ export async function scrapeWhatsAppJobLinks(
                             sourceType: "group",
                             sourceName: source.name,
                             result: noMessagesResult,
-                        });
-                        emit({
-                            type: "group_complete",
-                            groupName: source.name,
-                            result: { ...noMessagesResult, groupName: source.name },
                         });
                         continue;
                     }
@@ -1290,11 +1253,6 @@ export async function scrapeWhatsAppJobLinks(
                         sourceType: "group",
                         sourceName: source.name,
                         result: successResult,
-                    });
-                    emit({
-                        type: "group_complete",
-                        groupName: source.name,
-                        result: { ...successResult, groupName: source.name },
                     });
 
                     await randomJitter(800, 1800);
@@ -1417,13 +1375,6 @@ export async function scrapeWhatsAppJobLinks(
                     sourceName: source.name,
                     result: errResult,
                 });
-                if (source.type === "group") {
-                    emit({
-                        type: "group_complete",
-                        groupName: source.name,
-                        result: { ...errResult, groupName: source.name },
-                    });
-                }
                 await randomJitter(600, 1200);
             }
         }
@@ -1431,10 +1382,6 @@ export async function scrapeWhatsAppJobLinks(
         const finalUrls = Array.from(allJobLinks);
         const completedAt = new Date().toISOString();
         const durationMs = Date.now() - startTime;
-
-        const groupResults: GroupScrapeResult[] = sourceResults
-            .filter((r) => r.sourceType === "group")
-            .map((r) => ({ ...r, groupName: r.sourceName }));
 
         const importResult: WhatsAppImportResult = {
             success: true,
@@ -1448,7 +1395,6 @@ export async function scrapeWhatsAppJobLinks(
             skippedSources,
             failedSources,
             sourceResults,
-            groupResults,
             urls: finalUrls,
             totalUrls: finalUrls.length,
             startedAt,

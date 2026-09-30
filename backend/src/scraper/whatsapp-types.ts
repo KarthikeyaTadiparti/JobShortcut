@@ -22,8 +22,6 @@ export interface WhatsAppScrapeOptions {
     scope: ExtractionScope;
     /** Unified array of WhatsApp groups and channels to scrape */
     sources?: WhatsAppSourceConfig[] | undefined;
-    /** Legacy groups parameter for backward compatibility */
-    groups?: WhatsAppGroupConfig[] | undefined;
     sessionDir?: string | undefined;
     headless?: boolean | undefined;
     groupTimeoutMs?: number | undefined;
@@ -43,11 +41,6 @@ export interface SourceScrapeResult {
     error?: string | undefined;
 }
 
-/** Backward-compatible alias for GroupScrapeResult */
-export interface GroupScrapeResult extends SourceScrapeResult {
-    groupName: string;
-}
-
 export interface WhatsAppImportResult {
     success: boolean;
     scope: ExtractionScope;
@@ -60,8 +53,6 @@ export interface WhatsAppImportResult {
     skippedSources: number;
     failedSources: number;
     sourceResults: SourceScrapeResult[];
-    /** Backward compatibility alias for groupResults */
-    groupResults?: GroupScrapeResult[];
     urls: string[];
     totalUrls: number;
     startedAt: string;
@@ -76,9 +67,6 @@ export type WhatsAppSSEEvent =
     | { type: 'source_start'; sourceType: WhatsAppSourceType; sourceName: string; targetDomain: string; index: number; total: number }
     | { type: 'source_progress'; sourceType: WhatsAppSourceType; sourceName: string; message: string; unreadCount?: number | undefined }
     | { type: 'source_complete'; sourceType: WhatsAppSourceType; sourceName: string; result: SourceScrapeResult }
-    | { type: 'group_start'; groupName: string; targetDomain: string; index: number; total: number }
-    | { type: 'group_progress'; groupName: string; message: string; unreadCount?: number | undefined }
-    | { type: 'group_complete'; groupName: string; result: GroupScrapeResult }
     | { type: 'done'; result: WhatsAppImportResult }
     | { type: 'error'; message: string; fatal: boolean };
 
