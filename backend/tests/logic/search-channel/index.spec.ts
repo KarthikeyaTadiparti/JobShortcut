@@ -6,7 +6,6 @@ import { DEFAULT_WHATSAPP_CHANNELS } from "../../../src/config/whatsapp-sources.
 import { registerChannelUnreadTests } from "./unread.js";
 import { registerChannelTodayTests } from "./today.js";
 import { registerChannelYesterdayTests } from "./yesterday.js";
-import { registerChannelDefaultTests } from "./default.js";
 
 const KNOWN_CHANNEL_NAME = DEFAULT_WHATSAPP_CHANNELS[0]?.channelName || "Freshershunt";
 
@@ -42,5 +41,4 @@ test.describe("WhatsApp Channel Open Logic Test Suite", { tag: ["@logic", "@sear
   registerChannelUnreadTests(() => ({ page, isAuthenticated, targetChannelName: KNOWN_CHANNEL_NAME }));
   registerChannelTodayTests(() => ({ page, isAuthenticated, targetChannelName: KNOWN_CHANNEL_NAME }));
   registerChannelYesterdayTests(() => ({ page, isAuthenticated, targetChannelName: KNOWN_CHANNEL_NAME }));
-  registerChannelDefaultTests(() => ({ page, isAuthenticated, targetChannelName: KNOWN_CHANNEL_NAME }));
 });

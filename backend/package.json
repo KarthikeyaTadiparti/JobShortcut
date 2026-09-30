@@ -16,8 +16,7 @@
     "auth:whatsapp": "tsx src/scripts/whatsapp_auth.ts",
     "test:locators": "playwright test tests/locator",
     "test:logic": "playwright test tests/logic",
-    "test:report": "playwright show-report",
-    "extract:dom": "tsx src/scripts/extract_whatsapp_dom.ts"
+    "test:report": "playwright show-report"
   },
   "keywords": [],
   "author": "",

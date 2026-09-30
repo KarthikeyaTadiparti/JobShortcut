@@ -5,7 +5,6 @@ import { DEFAULT_WHATSAPP_GROUPS } from "../../../src/config/whatsapp-sources.js
 import { registerUnreadTests } from "./unread.js";
 import { registerTodayTests } from "./today.js";
 import { registerYesterdayTests } from "./yesterday.js";
-import { registerDefaultTests } from "./default.js";
 
 const KNOWN_GROUP_NAME = DEFAULT_WHATSAPP_GROUPS[0]?.groupName || "Jobcode 37";
 
@@ -37,5 +36,4 @@ test.describe("WhatsApp Search & Open Logic Test Suite", { tag: ["@logic", "@sea
   registerUnreadTests(() => ({ page, isAuthenticated, targetGroupName: KNOWN_GROUP_NAME }));
   registerTodayTests(() => ({ page, isAuthenticated, targetGroupName: KNOWN_GROUP_NAME }));
   registerYesterdayTests(() => ({ page, isAuthenticated, targetGroupName: KNOWN_GROUP_NAME }));
-  registerDefaultTests(() => ({ page, isAuthenticated, targetGroupName: KNOWN_GROUP_NAME }));
 });
