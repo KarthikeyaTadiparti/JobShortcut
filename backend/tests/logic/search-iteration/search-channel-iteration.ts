@@ -3,6 +3,7 @@ import {
   openFollowedChannel,
   navigateToChannelsTab,
   randomJitter,
+  ExtractionScope,
   type SearchAndOpenResult,
 } from "../../../src/scraper/whatsapp_scraper.js";
 import type { WhatsAppChannelConfig } from "../../../src/config/whatsapp-sources.js";
@@ -54,7 +55,7 @@ export function registerSearchChannelIterationTests(getContext: () => ChannelIte
             await highlightElement(searchInput, 200);
           }
 
-          const result: SearchAndOpenResult = await openFollowedChannel(page, channel.channelName);
+          const result: SearchAndOpenResult = await openFollowedChannel(page, channel.channelName, ExtractionScope.TODAY);
 
           iterationResults.push({
             index: itemNumber,

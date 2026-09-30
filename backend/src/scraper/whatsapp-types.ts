@@ -12,7 +12,11 @@ export type {
     WhatsAppChannelConfig,
 };
 
-export type ExtractionScope = 'unread' | 'today' | 'yesterday';
+export enum ExtractionScope {
+    UNREAD = 'unread',
+    TODAY = 'today',
+    YESTERDAY = 'yesterday',
+}
 
 export interface WhatsAppScrapeOptions {
     scope: ExtractionScope;

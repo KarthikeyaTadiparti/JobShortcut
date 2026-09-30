@@ -6,11 +6,11 @@ import {
     launchWhatsAppContext,
     checkWhatsAppAuthState,
 } from "../scraper/whatsapp_session.js";
-import type {
+import {
     ExtractionScope,
-    WhatsAppSourceConfig,
-    WhatsAppGroupConfig,
-    WhatsAppScrapeOptions,
+    type WhatsAppSourceConfig,
+    type WhatsAppGroupConfig,
+    type WhatsAppScrapeOptions,
 } from "../scraper/whatsapp-types.js";
 
 /**
@@ -18,7 +18,13 @@ import type {
  * Supports unified sources (groups & channels) as well as legacy groups format.
  */
 export const handleWhatsAppScrape = wrapAsync(async (req: Request, res: Response) => {
-    const scope: ExtractionScope = req.body.scope || "unread";
+    const rawScope = req.body.scope;
+    const scope: ExtractionScope =
+        rawScope === "today"
+            ? ExtractionScope.TODAY
+            : rawScope === "yesterday"
+            ? ExtractionScope.YESTERDAY
+            : ExtractionScope.UNREAD;
     const sources: WhatsAppSourceConfig[] | undefined = req.body.sources;
     const groups: WhatsAppGroupConfig[] | undefined = req.body.groups;
     const headless: boolean | undefined = req.body.headless;

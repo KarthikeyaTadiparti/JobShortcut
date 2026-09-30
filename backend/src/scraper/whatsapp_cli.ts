@@ -1,5 +1,5 @@
 import { scrapeWhatsAppJobLinks } from "./whatsapp_scraper.js";
-import type { ExtractionScope } from "./whatsapp-types.js";
+import { ExtractionScope } from "./whatsapp-types.js";
 
 async function main() {
     // Support positional or flag args: --scope=today or today
@@ -8,9 +8,12 @@ async function main() {
         "unread";
 
     const normalizedArg = rawArg.toLowerCase().trim();
-    const scope: ExtractionScope = ["unread", "today", "yesterday"].includes(normalizedArg)
-        ? (normalizedArg as ExtractionScope)
-        : "unread";
+    let scope: ExtractionScope = ExtractionScope.UNREAD;
+    if (normalizedArg === "today") {
+        scope = ExtractionScope.TODAY;
+    } else if (normalizedArg === "yesterday") {
+        scope = ExtractionScope.YESTERDAY;
+    }
 
     console.log(`\n=================== WHATSAPP JOB LINK SCRAPER ===================`);
     console.log(`Scope: ${scope.toUpperCase()}`);

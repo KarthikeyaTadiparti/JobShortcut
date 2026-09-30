@@ -18,15 +18,17 @@ import {
     checkWhatsAppAuthState,
     waitForWhatsAppLogin,
 } from "./whatsapp_session.js";
-import type {
+import {
     ExtractionScope,
-    WhatsAppScrapeOptions,
-    WhatsAppImportResult,
-    SourceScrapeResult,
-    GroupScrapeResult,
-    WhatsAppSSEEvent,
-    WhatsAppEventCallback,
+    type WhatsAppScrapeOptions,
+    type WhatsAppImportResult,
+    type SourceScrapeResult,
+    type GroupScrapeResult,
+    type WhatsAppSSEEvent,
+    type WhatsAppEventCallback,
 } from "./whatsapp-types.js";
+
+export { ExtractionScope };
 
 /**
  * Helper to pause execution with a randomized human-like jitter duration.
@@ -163,7 +165,7 @@ export async function navigateToChannelsTab(page: Page): Promise<boolean> {
  */
 export async function collectAllScopeMessages(
     page: Page,
-    scope: ExtractionScope,
+    scope: ExtractionScope = ExtractionScope.UNREAD,
     unreadCount = 0
 ): Promise<RawMessageData[]> {
     const collected = new Map<string, RawMessageData>();
@@ -333,36 +335,32 @@ export function cleanExtractedUrl(rawUrl: string): string {
 }
 
 /**
- * Generates search candidate queries for a group or channel.
+ * Generates search candidate queries for a group or channel without stripping essential keywords.
  */
 export function getSearchCandidates(name: string): string[] {
-    const candidates = [name];
+    const candidates: string[] = [];
 
-    const noBrackets = name.replace(/\s*[\(\[\{].*?[\)\]\}]/g, '').trim();
+    const trimmed = name.trim();
+    if (trimmed) {
+        candidates.push(trimmed);
+    }
+
+    // 1. Remove bracketed/parenthesized suffixes (e.g., "(2026 Batch)" -> "Placement Officer")
+    const noBrackets = trimmed.replace(/\s*[\(\[\{].*?[\)\]\}]/g, '').trim();
     if (noBrackets && !candidates.includes(noBrackets)) {
         candidates.push(noBrackets);
     }
 
+    // 2. Remove leading serial numbers (e.g., "39 -Freshersdunia.in..." -> "Freshersdunia.in...")
     const noPrefixNumber = noBrackets.replace(/^\d+\s*[-–]\s*/, '').trim();
     if (noPrefixNumber && noPrefixNumber.length >= 3 && !candidates.includes(noPrefixNumber)) {
         candidates.push(noPrefixNumber);
     }
 
-    const cleanCore = noPrefixNumber
-        .replace(/\.(in|com|site|org|net|co\.in)\b/gi, '')
-        .split(/[-–|]/)[0]
-        ?.replace(/\s+(jobs|alerts|updates|group|openings|batch|community)\b.*$/i, '')
-        .trim();
-    if (cleanCore && cleanCore.length >= 3 && !candidates.includes(cleanCore)) {
-        candidates.push(cleanCore);
-    }
-
-    const noSuffix = noBrackets
-        .replace(/\s*[-–]\s*\d+.*$/, '')
-        .replace(/\s+(jobs|alerts|updates|group|openings|batch|community)\b.*$/i, '')
-        .trim();
-    if (noSuffix && noSuffix.length >= 3 && !candidates.includes(noSuffix)) {
-        candidates.push(noSuffix);
+    // 3. Extract primary domain/brand name (e.g., "Freshersdunia.in - Freshers Job" -> "Freshersdunia.in")
+    const primarySection = noPrefixNumber.split(/\s*[-–|]\s*/)[0]?.trim();
+    if (primarySection && primarySection.length >= 5 && !candidates.includes(primarySection)) {
+        candidates.push(primarySection);
     }
 
     return candidates;
@@ -380,7 +378,7 @@ export interface SearchAndOpenResult {
 export async function searchAndOpenGroup(
     page: Page,
     groupName: string,
-    scope?: ExtractionScope
+    scope: ExtractionScope = ExtractionScope.UNREAD
 ): Promise<SearchAndOpenResult> {
     try {
         await clearActiveSearchInput(page);
@@ -403,7 +401,7 @@ export async function searchAndOpenGroup(
         );
 
         if (alreadyOpen) {
-            if (scope === "unread") {
+            if (scope === ExtractionScope.UNREAD) {
                 return { status: "skipped_no_unread", unreadCount: 0 };
             }
             return { status: "opened", unreadCount: 0 };
@@ -431,24 +429,38 @@ export async function searchAndOpenGroup(
             await page.waitForFunction(
                 ({ targetName, candidateQueries, rowSelector, titleSelector }) => {
                     const rows = Array.from(document.querySelectorAll(rowSelector));
-                    const normalize = (str: string) => str.replace(/[\u2013\u2014]/g, "-").replace(/\s+/g, " ").trim().toLowerCase();
+                    const normalize = (str: string) =>
+                        str.replace(/[\u2013\u2014\u2212]/g, "-").replace(/[\u00A0\u2000-\u200B]/g, " ").replace(/\s+/g, " ").trim().toLowerCase();
                     const expected = normalize(targetName);
                     const expectedQueries = candidateQueries.map(normalize);
 
                     for (let i = 0; i < Math.min(rows.length, 30); i++) {
                         const row = rows[i] as HTMLElement;
                         if (!row) continue;
-                        const titleSpan = row.querySelector(titleSelector);
-                        const titleText = normalize(titleSpan?.getAttribute("title") || titleSpan?.textContent || "");
-                        const rowText = normalize(row.getAttribute("title") || row.textContent || "");
-                        const actualName = titleText || rowText;
 
-                        if (
-                            actualName === expected ||
-                            actualName.includes(expected) ||
-                            (titleText.length > 2 && expected.includes(titleText)) ||
-                            expectedQueries.some((q) => q.length >= 3 && (actualName.includes(q) || titleText.includes(q)))
-                        ) {
+                        const titleEl =
+                            row.querySelector('[data-testid="cell-frame-title"]') ||
+                            row.querySelector(titleSelector) ||
+                            row.querySelector('span[title]') ||
+                            row.querySelector('span[dir="auto"]');
+
+                        const titleAttr =
+                            row.querySelector('[title]')?.getAttribute('title') ||
+                            titleEl?.getAttribute('title') ||
+                            row.getAttribute('title') ||
+                            '';
+
+                        const titleText = normalize(titleAttr || titleEl?.textContent || '');
+                        const rowText = normalize(row.textContent || '');
+
+                        const isMatch =
+                            titleText === expected ||
+                            titleText.includes(expected) ||
+                            (expected.length >= 5 && titleText.length >= 5 && expected.includes(titleText)) ||
+                            expectedQueries.some((q) => q.length >= 4 && (titleText.includes(q) || rowText.includes(q))) ||
+                            rowText.includes(expected);
+
+                        if (isMatch) {
                             return true;
                         }
                     }
@@ -463,11 +475,15 @@ export async function searchAndOpenGroup(
                 { timeout: 3500 }
             ).catch(() => false);
 
-            // 4. Inspect matches across all search result rows and retrieve matching row index
+            // 4. Inspect matches, tag exact matching element, and dispatch click
             const matchInfo = await page.evaluate(
                 ({ targetName, candidateQueries, rowSelector, titleSelector, badgeSelector }) => {
+                    // Clear any previous marker attributes
+                    document.querySelectorAll('[data-target-active-row]').forEach((el) => el.removeAttribute('data-target-active-row'));
+
                     const rows = Array.from(document.querySelectorAll(rowSelector));
-                    const normalize = (str: string) => str.replace(/[\u2013\u2014]/g, "-").replace(/\s+/g, " ").trim().toLowerCase();
+                    const normalize = (str: string) =>
+                        str.replace(/[\u2013\u2014\u2212]/g, "-").replace(/[\u00A0\u2000-\u200B]/g, " ").replace(/\s+/g, " ").trim().toLowerCase();
                     const expected = normalize(targetName);
                     const expectedQueries = candidateQueries.map(normalize);
 
@@ -475,16 +491,27 @@ export async function searchAndOpenGroup(
                         const row = rows[i] as HTMLElement;
                         if (!row) continue;
 
-                        const titleSpan = row.querySelector(titleSelector);
-                        const titleText = normalize(titleSpan?.getAttribute("title") || titleSpan?.textContent || "");
-                        const rowText = normalize(row.getAttribute("title") || row.textContent || "");
-                        const actualName = titleText || rowText;
+                        const titleEl =
+                            row.querySelector('[data-testid="cell-frame-title"]') ||
+                            row.querySelector(titleSelector) ||
+                            row.querySelector('span[title]') ||
+                            row.querySelector('span[dir="auto"]');
+
+                        const titleAttr =
+                            row.querySelector('[title]')?.getAttribute('title') ||
+                            titleEl?.getAttribute('title') ||
+                            row.getAttribute('title') ||
+                            '';
+
+                        const titleText = normalize(titleAttr || titleEl?.textContent || '');
+                        const rowText = normalize(row.textContent || '');
 
                         const isMatch =
-                            actualName === expected ||
-                            actualName.includes(expected) ||
-                            (titleText.length > 2 && expected.includes(titleText)) ||
-                            expectedQueries.some((q) => q.length >= 3 && (actualName.includes(q) || titleText.includes(q)));
+                            titleText === expected ||
+                            titleText.includes(expected) ||
+                            (expected.length >= 5 && titleText.length >= 5 && expected.includes(titleText)) ||
+                            expectedQueries.some((q) => q.length >= 4 && (titleText.includes(q) || rowText.includes(q))) ||
+                            rowText.includes(expected);
 
                         if (isMatch) {
                             let unreadCount = 0;
@@ -494,8 +521,18 @@ export async function searchAndOpenGroup(
                                 const match = label.match(/\d+/);
                                 if (match) unreadCount = parseInt(match[0], 10);
                             }
+
+                            // Tag the exact matching element for Playwright locator
+                            row.setAttribute('data-target-active-row', 'true');
+
+                            // Dispatch complete pointer and mouse event chain to activate React handlers
+                            row.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+                            row.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+                            row.dispatchEvent(new PointerEvent('pointerup', { bubbles: true }));
+                            row.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
                             row.click();
-                            return { matched: true, unreadCount, index: i };
+
+                            return { matched: true, unreadCount };
                         }
                     }
                     return null;
@@ -511,15 +548,15 @@ export async function searchAndOpenGroup(
 
             if (matchInfo && matchInfo.matched) {
                 // 5. For unread scope, skip if unreadCount is 0
-                if (scope === "unread" && matchInfo.unreadCount === 0) {
+                if (scope === ExtractionScope.UNREAD && matchInfo.unreadCount === 0) {
                     await clearActiveSearchInput(page);
                     return { status: "skipped_no_unread", unreadCount: 0 };
                 }
 
                 // 6. Click target row via Playwright to ensure synthetic and native pointer events
-                const matchingRows = page.locator(rowSel);
-                if ((await matchingRows.count()) > matchInfo.index) {
-                    await matchingRows.nth(matchInfo.index).click({ force: true }).catch(() => {});
+                const taggedRow = page.locator('[data-target-active-row="true"]').first();
+                if ((await taggedRow.count()) > 0) {
+                    await taggedRow.click({ force: true }).catch(() => {});
                 }
 
                 // 7. Wait for conversation panel & settle
@@ -551,7 +588,7 @@ export async function searchAndOpenGroup(
 export async function openFollowedChannel(
     page: Page,
     channelName: string,
-    scope?: ExtractionScope
+    scope: ExtractionScope = ExtractionScope.UNREAD
 ): Promise<SearchAndOpenResult> {
     try {
         // 0. Check if channel is already active in #main
@@ -572,7 +609,7 @@ export async function openFollowedChannel(
         );
 
         if (alreadyOpen) {
-            if (scope === "unread") {
+            if (scope === ExtractionScope.UNREAD) {
                 return { status: "skipped_no_unread", unreadCount: 0 };
             }
             return { status: "opened", unreadCount: 0 };
@@ -620,7 +657,7 @@ export async function openFollowedChannel(
         );
 
         if (matchInfo) {
-            if (scope === "unread" && matchInfo.unreadCount === 0) {
+            if (scope === ExtractionScope.UNREAD && matchInfo.unreadCount === 0) {
                 return { status: "skipped_no_unread", unreadCount: 0 };
             }
 
@@ -678,7 +715,7 @@ export async function openFollowedChannel(
             );
 
             if (searchMatch) {
-                if (scope === "unread" && searchMatch.unreadCount === 0) {
+                if (scope === ExtractionScope.UNREAD && searchMatch.unreadCount === 0) {
                     await clearActiveSearchInput(page);
                     return { status: "skipped_no_unread", unreadCount: 0 };
                 }
@@ -868,7 +905,7 @@ export async function evaluateConversationMessages(page: Page): Promise<RawMessa
 export async function extractChannelBroadcastLinks(
     page: Page,
     channelConfig: WhatsAppSourceConfig | WhatsAppChannelConfig,
-    scope: ExtractionScope,
+    scope: ExtractionScope = ExtractionScope.UNREAD,
     unreadCount = 0
 ): Promise<{ links: string[]; renderedCount: number; processedCount: number }> {
     const rawMessages = await collectAllScopeMessages(page, scope, unreadCount);
@@ -879,7 +916,7 @@ export async function extractChannelBroadcastLinks(
     const targetDomain = 'targetDomain' in channelConfig ? channelConfig.targetDomain : '';
     const allowedDomains = channelConfig.allowedDomains || [targetDomain];
 
-    if (scope === "unread") {
+    if (scope === ExtractionScope.UNREAD) {
         const startIndex = unreadCount > 0 ? Math.max(0, renderedCount - unreadCount) : 0;
         processedCount = renderedCount - startIndex;
 
@@ -894,7 +931,7 @@ export async function extractChannelBroadcastLinks(
                 }
             }
         }
-    } else if (scope === "today") {
+    } else if (scope === ExtractionScope.TODAY) {
         for (const msg of rawMessages) {
             const isToday =
                 isDateToday(msg.dateSection) ||
@@ -911,7 +948,7 @@ export async function extractChannelBroadcastLinks(
                 }
             }
         }
-    } else if (scope === "yesterday") {
+    } else if (scope === ExtractionScope.YESTERDAY) {
         for (const msg of rawMessages) {
             const isYesterday =
                 isDateYesterday(msg.dateSection) ||
@@ -945,7 +982,7 @@ export async function scrapeWhatsAppJobLinks(
 ): Promise<WhatsAppImportResult> {
     const startTime = Date.now();
     const startedAt = new Date().toISOString();
-    const scope = options.scope || "unread";
+    const scope: ExtractionScope = options.scope || ExtractionScope.UNREAD;
 
     // Resolve sources to scrape: priority to unified `sources`, or DEFAULT_WHATSAPP_SOURCES
     let sourcesToScrape: WhatsAppSourceConfig[];

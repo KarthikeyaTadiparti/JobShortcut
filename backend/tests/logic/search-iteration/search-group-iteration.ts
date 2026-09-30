@@ -3,6 +3,7 @@ import {
   searchAndOpenGroup,
   navigateToChatsTab,
   randomJitter,
+  ExtractionScope,
   type SearchAndOpenResult,
 } from "../../../src/scraper/whatsapp_scraper.js";
 import type { WhatsAppGroupConfig } from "../../../src/config/whatsapp-sources.js";
@@ -54,7 +55,7 @@ export function registerSearchGroupIterationTests(getContext: () => GroupIterati
             await highlightElement(searchInput, 200);
           }
 
-          const result: SearchAndOpenResult = await searchAndOpenGroup(page, group.groupName);
+          const result: SearchAndOpenResult = await searchAndOpenGroup(page, group.groupName, ExtractionScope.TODAY);
 
           iterationResults.push({
             index: itemNumber,
