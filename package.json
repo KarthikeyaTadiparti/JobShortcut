@@ -12,8 +12,7 @@
     "test:locators": "npm --prefix backend run test:locators",
     "test:locators:auth": "npm --prefix backend run test:locators:auth",
     "test:locators:chat": "npm --prefix backend run test:locators:chat",
-    "test:locators:report": "npm --prefix backend run test:locators:report",
-    "extract:dom": "npm --prefix backend run extract:dom --"
+    "test:locators:report": "npm --prefix backend run test:locators:report"
   },
   "repository": {
     "type": "git",

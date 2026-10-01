@@ -1,18 +1,13 @@
 import { type Page } from "playwright";
 import {
     DEFAULT_WHATSAPP_SOURCES,
-    DEFAULT_WHATSAPP_GROUPS,
-    DEFAULT_WHATSAPP_CHANNELS,
-    type WhatsAppSourceType,
     type WhatsAppSourceConfig,
-    type WhatsAppGroupConfig,
     type WhatsAppChannelConfig,
-} from "../config/whatsapp-sources.js";
+} from "./config/whatsapp-sources.js";
 import {
     WHATSAPP_LOCATORS,
-    getLocatorSelectors,
     getCombinedSelector,
-} from "../config/whatsapp_locators.js";
+} from "./config/whatsapp_locators.js";
 import {
     launchWhatsAppContext,
     checkWhatsAppAuthState,
@@ -25,345 +20,38 @@ import {
     type SourceScrapeResult,
     type WhatsAppSSEEvent,
     type WhatsAppEventCallback,
+    type RawMessageData,
 } from "./whatsapp-types.js";
+import {
+    collectScopeMessagesWithStats,
+    evaluateWindowMessages,
+    type HarvestOptions,
+    type HarvestStats,
+} from "./whatsapp_harvester.js";
+import { randomJitter, clearActiveSearchInput, navigateToChatsTab, navigateToChannelsTab } from "./helpers/whatsapp_navigation.js";
+import { cleanExtractedUrl, isMatchingDomain } from "./helpers/whatsapp_links.js";
+import { getSearchCandidates } from "./helpers/whatsapp_search.js";
+import { describeEmptyScope } from "./helpers/whatsapp_scope_report.js";
 
 export { ExtractionScope };
+export type { RawMessageData };
 
 /**
- * Helper to pause execution with a randomized human-like jitter duration.
- */
-export async function randomJitter(minMs = 300, maxMs = 700): Promise<void> {
-    const delay = Math.floor(Math.random() * (maxMs - minMs + 1)) + minMs;
-    await new Promise((resolve) => setTimeout(resolve, delay));
-}
-
-/**
- * Ensures any active search or filter input state is cleanly sanitized and reset prior to typing.
- * Handles React controlled inputs, clear buttons, and contenteditable boxes without triggering global view dismissals.
- */
-export async function clearActiveSearchInput(page: Page): Promise<void> {
-    try {
-        const searchInputSelector = `${getCombinedSelector(WHATSAPP_LOCATORS.chatListSearchInput)}, ${getCombinedSelector(WHATSAPP_LOCATORS.channelsSearchInput)}`;
-
-        // 1. Clear any active search input element via React-compatible native property setter
-        await page.evaluate((selector) => {
-            const inputs = document.querySelectorAll(selector);
-            const nativeSetter = Object.getOwnPropertyDescriptor(
-                window.HTMLInputElement.prototype,
-                'value'
-            )?.set;
-
-            for (const input of Array.from(inputs)) {
-                const el = input as HTMLElement;
-                if (nativeSetter && 'value' in el) {
-                    nativeSetter.call(el, '');
-                } else if ('value' in el) {
-                    (el as HTMLInputElement).value = '';
-                }
-                el.textContent = '';
-                el.dispatchEvent(new Event('input', { bubbles: true }));
-                el.dispatchEvent(new Event('change', { bubbles: true }));
-            }
-        }, searchInputSelector).catch(() => false);
-
-        // 2. Locate and click any search clear / cancel button inside the search container
-        const clearBtnSelectors = getLocatorSelectors(WHATSAPP_LOCATORS.chatListSearchClearBtn);
-        for (const sel of clearBtnSelectors) {
-            const btn = page.locator(sel).first();
-            if ((await btn.count()) > 0 && (await btn.isVisible().catch(() => false))) {
-                await btn.click({ force: true }).catch(() => { });
-                await page.waitForTimeout(100);
-                break;
-            }
-        }
-
-        // 3. Fallback: If search input is visible and still contains text, select all and backspace
-        const inputLoc = page.locator(searchInputSelector).first();
-        if ((await inputLoc.count()) > 0 && (await inputLoc.isVisible().catch(() => false))) {
-            const currentVal = await inputLoc.inputValue().catch(() => "");
-            if (currentVal && currentVal.length > 0) {
-                await inputLoc.focus().catch(() => {});
-                await page.keyboard.press("ControlOrMeta+A").catch(() => {});
-                await page.keyboard.press("Backspace").catch(() => {});
-                await page.waitForTimeout(100);
-            }
-        }
-    } catch {
-        // Non-fatal sanitization error
-    }
-}
-
-/**
- * Switches WhatsApp Web navigation to the Chats tab if not already active.
- */
-export async function navigateToChatsTab(page: Page): Promise<void> {
-    try {
-        const chatsListSel = getCombinedSelector(WHATSAPP_LOCATORS.chatListContainer);
-        const channelsListSel = getCombinedSelector(WHATSAPP_LOCATORS.channelsListContainer);
-
-        const isChatsView = await page.evaluate(({ chats, channels }) => {
-            const pane = document.querySelector(chats);
-            const channelsHeader = document.querySelector(channels);
-            return !!pane && !channelsHeader;
-        }, { chats: chatsListSel, channels: channelsListSel });
-
-        if (isChatsView) return;
-
-        const chatsTabSelectors = getLocatorSelectors(WHATSAPP_LOCATORS.chatsTabBtn);
-
-        for (const sel of chatsTabSelectors) {
-            const tab = page.locator(sel).first();
-            if ((await tab.count()) > 0 && (await tab.isVisible().catch(() => false))) {
-                await tab.click({ force: true }).catch(() => { });
-                await page.waitForTimeout(600);
-                break;
-            }
-        }
-    } catch {
-        // Non-fatal navigation issue
-    }
-}
-
-/**
- * Switches WhatsApp Web navigation to the Channels / Updates sidebar rail view if not already active.
- */
-export async function navigateToChannelsTab(page: Page): Promise<boolean> {
-    try {
-        const channelsListSel = getCombinedSelector(WHATSAPP_LOCATORS.channelsListContainer);
-
-        const isAlreadyChannels = await page.evaluate((selector) => {
-            return !!document.querySelector(selector);
-        }, channelsListSel);
-
-        if (isAlreadyChannels) return true;
-
-        const channelsTabSelectors = getLocatorSelectors(WHATSAPP_LOCATORS.channelsTabBtn);
-
-        for (const sel of channelsTabSelectors) {
-            const tab = page.locator(sel).first();
-            if ((await tab.count()) > 0 && (await tab.isVisible().catch(() => false))) {
-                await tab.click({ force: true }).catch(() => { });
-                await page.waitForTimeout(1000);
-                return true;
-            }
-        }
-
-        // Fallback check
-        return await page.evaluate((selector) => {
-            return !!document.querySelector(selector);
-        }, channelsListSel);
-    } catch (err) {
-        console.warn("Failed to navigate to Channels tab:", err);
-        return false;
-    }
-}
-
-/**
- * Progressively scrolls and accumulates all messages matching the target extraction scope,
- * handling WhatsApp Web's virtual message DOM list for both groups and channels.
+ * Collects every message in the target extraction scope from the open conversation,
+ * oldest -> newest, by scanning WhatsApp Web's virtualized message list upward and
+ * merging overlapping windows. See whatsapp_harvester.ts for the scan algorithm.
  */
 export async function collectAllScopeMessages(
     page: Page,
     scope: ExtractionScope = ExtractionScope.UNREAD,
-    unreadCount = 0
+    unreadCount = 0,
+    options: HarvestOptions = {}
 ): Promise<RawMessageData[]> {
-    const collected = new Map<string, RawMessageData>();
-
-    const harvest = async () => {
-        const raw = await evaluateConversationMessages(page);
-        for (const msg of raw) {
-            const key = msg.prePlainText || (msg.rawLinks.length > 0 ? msg.rawLinks.join('|') : msg.text.slice(0, 100));
-            if (key && !collected.has(key)) {
-                collected.set(key, msg);
-            }
-        }
-    };
-
-    // 1. Initial bottom harvest
-    await harvest();
-
-    if (scope === "unread" && unreadCount > 0 && collected.size >= unreadCount) {
-        return Array.from(collected.values());
-    }
-
-    // 2. Progressive upward scroll
-    const maxScrollSteps = scope === "unread" ? 10 : 25;
-    const panelSel = getCombinedSelector(WHATSAPP_LOCATORS.conversationPanelMessages);
-
-    for (let step = 1; step <= maxScrollSteps; step++) {
-        const scrollInfo = await page.evaluate(async (panelSelector) => {
-            const main = document.querySelector('#main');
-            if (!main) return { atTop: true, scrollTop: 0 };
-
-            const panel = (
-                main.querySelector(panelSelector) ||
-                main.querySelector('[data-testid="conversation-panel-messages"]') ||
-                main.querySelector('.copyable-area [tabindex="0"]') ||
-                main.querySelector('.copyable-area') ||
-                main
-            ) as HTMLElement | null;
-
-            if (!panel) return { atTop: true, scrollTop: 0 };
-
-            const prevTop = panel.scrollTop;
-            panel.scrollTop = Math.max(0, panel.scrollTop - 950);
-            return {
-                atTop: panel.scrollTop === 0 && prevTop === 0,
-                scrollTop: panel.scrollTop,
-            };
-        }, panelSel);
-
-        await page.waitForTimeout(400); // allow virtual list to render previous DOM nodes
-        await harvest();
-
-        if (scope === "unread" && unreadCount > 0 && collected.size >= unreadCount) {
-            break;
-        }
-
-        if (scope === "today") {
-            const hasYesterdayOrOlder = Array.from(collected.values()).some((m) => {
-                if (!m.prePlainText && !m.dateSection) return false;
-                return isDateYesterday(m.prePlainText) ||
-                    isDateYesterday(m.dateSection) ||
-                    (!isDateToday(m.prePlainText) && !isDateToday(m.dateSection) && (m.prePlainText.includes('/') || m.prePlainText.includes('-')));
-            });
-            if (hasYesterdayOrOlder) {
-                break;
-            }
-        }
-
-        if (scope === "yesterday") {
-            const hasOlderThanYesterday = Array.from(collected.values()).some((m) => {
-                if (!m.prePlainText && !m.dateSection) return false;
-                return !isDateToday(m.prePlainText) &&
-                    !isDateToday(m.dateSection) &&
-                    !isDateYesterday(m.prePlainText) &&
-                    !isDateYesterday(m.dateSection) &&
-                    (m.prePlainText.includes('/') || m.prePlainText.includes('-') || /^(monday|tuesday|wednesday|thursday|friday|saturday|sunday)/i.test(m.dateSection));
-            });
-            if (hasOlderThanYesterday) {
-                break;
-            }
-        }
-
-        if (scrollInfo.atTop) {
-            break;
-        }
-    }
-
-    return Array.from(collected.values());
+    const { messages } = await collectScopeMessagesWithStats(page, scope, unreadCount, options);
+    return messages;
 }
 
-/**
- * Helper to escape special regex characters.
- */
-function escapeRegex(str: string): string {
-    return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-/**
- * Helper to check if a date string or data-pre-plain-text matches today.
- */
-export function isDateToday(text: string): boolean {
-    if (!text) return false;
-    if (/\btoday\b/i.test(text)) return true;
-
-    const today = new Date();
-    const d = today.getDate();
-    const m = today.getMonth() + 1;
-    const y = today.getFullYear();
-
-    const dStr = String(d);
-    const mStr = String(m);
-    const dPad = String(d).padStart(2, "0");
-    const mPad = String(m).padStart(2, "0");
-
-    const patterns = [
-        `${dStr}/${mStr}/${y}`,
-        `${dPad}/${mPad}/${y}`,
-        `${dStr}-${mStr}-${y}`,
-        `${dPad}-${mPad}-${y}`,
-        `${mStr}/${dStr}/${y}`,
-        `${mPad}/${dPad}/${y}`,
-        `${y}-${mPad}-${dPad}`,
-    ];
-
-    return patterns.some((p) => text.includes(p));
-}
-
-/**
- * Helper to check if a date string or data-pre-plain-text matches yesterday.
- */
-export function isDateYesterday(text: string): boolean {
-    if (!text) return false;
-    if (/\byesterday\b/i.test(text)) return true;
-
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    const d = yesterday.getDate();
-    const m = yesterday.getMonth() + 1;
-    const y = yesterday.getFullYear();
-
-    const dStr = String(d);
-    const mStr = String(m);
-    const dPad = String(d).padStart(2, "0");
-    const mPad = String(m).padStart(2, "0");
-
-    const patterns = [
-        `${dStr}/${mStr}/${y}`,
-        `${dPad}/${mPad}/${y}`,
-        `${dStr}-${mStr}-${y}`,
-        `${dPad}-${mPad}-${y}`,
-        `${mStr}/${dStr}/${y}`,
-        `${mPad}/${dPad}/${y}`,
-        `${y}-${mPad}-${dPad}`,
-    ];
-
-    return patterns.some((p) => text.includes(p));
-}
-
-/**
- * Cleans extracted URL to remove trailing punctuation, bracket symbols, or timestamp artifacts.
- */
-export function cleanExtractedUrl(rawUrl: string): string {
-    let url = rawUrl.trim();
-    url = url.replace(/[.,;:!?)>"']+$/, '');
-    url = url.replace(/\/\d{1,2}:\d{2}(:\d{2})?(am|pm)?$/i, '/');
-    url = url.replace(/\d{1,2}:\d{2}(:\d{2})?(am|pm)?$/i, '');
-    return url;
-}
-
-/**
- * Generates search candidate queries for a group or channel without stripping essential keywords.
- */
-export function getSearchCandidates(name: string): string[] {
-    const candidates: string[] = [];
-
-    const trimmed = name.trim();
-    if (trimmed) {
-        candidates.push(trimmed);
-    }
-
-    // 1. Remove bracketed/parenthesized suffixes (e.g., "(2026 Batch)" -> "Placement Officer")
-    const noBrackets = trimmed.replace(/\s*[\(\[\{].*?[\)\]\}]/g, '').trim();
-    if (noBrackets && !candidates.includes(noBrackets)) {
-        candidates.push(noBrackets);
-    }
-
-    // 2. Remove leading serial numbers (e.g., "39 -Freshersdunia.in..." -> "Freshersdunia.in...")
-    const noPrefixNumber = noBrackets.replace(/^\d+\s*[-–]\s*/, '').trim();
-    if (noPrefixNumber && noPrefixNumber.length >= 3 && !candidates.includes(noPrefixNumber)) {
-        candidates.push(noPrefixNumber);
-    }
-
-    // 3. Extract primary domain/brand name (e.g., "Freshersdunia.in - Freshers Job" -> "Freshersdunia.in")
-    const primarySection = noPrefixNumber.split(/\s*[-–|]\s*/)[0]?.trim();
-    if (primarySection && primarySection.length >= 5 && !candidates.includes(primarySection)) {
-        candidates.push(primarySection);
-    }
-
-    return candidates;
-}
+export { collectScopeMessagesWithStats };
 
 export interface SearchAndOpenResult {
     status: "opened" | "skipped_no_unread" | "not_found";
@@ -740,161 +428,26 @@ export async function openFollowedChannel(
 }
 
 /**
- * Checks if a given hyperlink matches the target domain or any allowed domain aliases.
- */
-export function isMatchingDomain(
-    href: string,
-    source: { targetDomain: string; allowedDomains?: string[] | undefined }
-): boolean {
-    if (!href) return false;
-    try {
-        const urlObj = new URL(href);
-        const hostname = urlObj.hostname.toLowerCase().replace(/^www\./, "");
-        const target = source.targetDomain.toLowerCase().replace(/^www\./, "");
-
-        if (hostname === target || hostname.endsWith(`.${target}`) || target.endsWith(`.${hostname}`)) {
-            return true;
-        }
-
-        if (source.allowedDomains && source.allowedDomains.length > 0) {
-            return source.allowedDomains.some((d) => {
-                const normD = d.toLowerCase().replace(/^www\./, "");
-                return hostname === normD || hostname.endsWith(`.${normD}`) || normD.endsWith(`.${hostname}`);
-            });
-        }
-
-        return false;
-    } catch {
-        return false;
-    }
-}
-
-/**
- * Interface representing a message evaluated in DOM.
- */
-export interface RawMessageData {
-    rawLinks: string[];
-    text: string;
-    prePlainText: string;
-    dateSection: string;
-}
-
-/**
- * Evaluates messages, broadcast posts, and date dividers in the active conversation panel.
+ * Evaluates the messages mounted in the active conversation window (oldest -> newest).
+ * Falls back to every anchor in #main when no structured message rows are found.
  */
 export async function evaluateConversationMessages(page: Page): Promise<RawMessageData[]> {
-    const msgContainerSel = getCombinedSelector(WHATSAPP_LOCATORS.messageContainer);
-    const dateDividerSel = getCombinedSelector(WHATSAPP_LOCATORS.dateDividerSpan);
-    const linkSel = getCombinedSelector(WHATSAPP_LOCATORS.messageAnchorLink);
+    const messages = await evaluateWindowMessages(page);
+    if (messages.length > 0) {
+        return messages;
+    }
 
-    return await page.evaluate(({ msgContainerSelector, dateDividerSelector, linkSelector }) => {
-        const urlRegex = /https?:\/\/[^\s<>"'{}|\\^`]+/gi;
-        const results: {
-            rawLinks: string[];
-            text: string;
-            prePlainText: string;
-            dateSection: string;
-        }[] = [];
-
-        const main =
-            document.querySelector('#main') ||
-            document.querySelector('[data-testid="conversation-panel-wrapper"]') ||
-            document.querySelector('[data-testid="conversation-panel-body"]') ||
-            document.querySelector('.copyable-area') ||
-            document.body;
-
-        // 1. Find all date divider headers
-        const allSpans = Array.from(main.querySelectorAll(dateDividerSelector));
-        const dateHeaders: { el: Element; text: string }[] = [];
-
-        for (const s of allSpans) {
-            const t = s.textContent?.trim() || '';
-            if (
-                t &&
-                !t.includes(':') &&
-                t.length < 35 &&
-                (/^(today|yesterday|monday|tuesday|wednesday|thursday|friday|saturday|sunday)/i.test(t) ||
-                    /\b\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}\b/.test(t) ||
-                    /\b(january|february|march|april|may|june|july|august|september|october|november|december)\b/i.test(t))
-            ) {
-                dateHeaders.push({ el: s, text: t });
-            }
-        }
-
-        // 2. Find all message elements (groups and channels)
-        const messageElements = Array.from(main.querySelectorAll(msgContainerSelector));
-
-        const uniqueMessages: HTMLElement[] = [];
-        const seenKeys = new Set<string>();
-
-        for (const el of messageElements) {
-            const copyable = el.classList.contains('copyable-text') ? el : el.closest('.copyable-text') || el.querySelector('.copyable-text');
-            const prePlain = copyable?.getAttribute('data-pre-plain-text') || '';
-            const textContent = el.textContent || '';
-            const key = prePlain || textContent.slice(0, 80);
-
-            if (key && !seenKeys.has(key)) {
-                seenKeys.add(key);
-                uniqueMessages.push((copyable || el) as HTMLElement);
-            }
-        }
-
-        // 3. Process each unique message
-        for (const msg of uniqueMessages) {
-            const prePlainText = msg.getAttribute('data-pre-plain-text') || msg.closest('[data-pre-plain-text]')?.getAttribute('data-pre-plain-text') || '';
-            const text = msg.textContent || '';
-
-            let dateSection = '';
-            for (const header of dateHeaders) {
-                if (header.el.compareDocumentPosition(msg) & Node.DOCUMENT_POSITION_FOLLOWING) {
-                    dateSection = header.text;
-                }
-            }
-
-            const linkSet = new Set<string>();
-            const msgParent = msg.closest('[data-testid="msg-container"]') || msg.closest('div[role="row"]') || msg;
-            const anchors = msgParent.querySelectorAll(linkSelector);
-            anchors.forEach((a) => {
-                const href = a.getAttribute('href');
-                if (href && (href.startsWith('http://') || href.startsWith('https://'))) {
-                    linkSet.add(href.trim());
-                }
-            });
-
-            const matches = text.match(urlRegex);
-            if (matches) {
-                matches.forEach((url) => linkSet.add(url.trim()));
-            }
-
-            results.push({
-                rawLinks: Array.from(linkSet),
-                text,
-                prePlainText,
-                dateSection,
-            });
-        }
-
-        // 4. Fallback: If no structured messages found, scan all <a> tags directly in main
-        if (results.length === 0) {
-            const allAnchors = Array.from(main.querySelectorAll('a[href]'));
-            for (const a of allAnchors) {
-                const href = a.getAttribute('href');
-                if (href && (href.startsWith('http://') || href.startsWith('https://'))) {
-                    results.push({
-                        rawLinks: [href.trim()],
-                        text: a.textContent || '',
-                        prePlainText: '',
-                        dateSection: '',
-                    });
-                }
-            }
-        }
-
-        return results;
-    }, {
-        msgContainerSelector: msgContainerSel,
-        dateDividerSelector: dateDividerSel,
-        linkSelector: linkSel,
+    return await page.evaluate(() => {
+        const main = document.querySelector('#main') || document.body;
+        return Array.from(main.querySelectorAll('a[href]'))
+            .map((a) => ({ href: (a.getAttribute('href') || '').trim(), text: a.textContent || '' }))
+            .filter((a) => /^https?:\/\//i.test(a.href))
+            .map((a) => ({
+                rawLinks: [a.href],
+                text: a.text,
+                prePlainText: '',
+                dateSection: '',
+            }));
     });
 }
 
@@ -906,61 +459,21 @@ export async function extractChannelBroadcastLinks(
     channelConfig: WhatsAppSourceConfig | WhatsAppChannelConfig,
     scope: ExtractionScope = ExtractionScope.UNREAD,
     unreadCount = 0
-): Promise<{ links: string[]; renderedCount: number; processedCount: number }> {
-    const rawMessages = await collectAllScopeMessages(page, scope, unreadCount);
+): Promise<{ links: string[]; renderedCount: number; processedCount: number; stats: HarvestStats }> {
+    // The harvester already returns only the messages inside the scope.
+    const { messages: rawMessages, stats } = await collectScopeMessagesWithStats(page, scope, unreadCount);
     const renderedCount = rawMessages.length;
+    const processedCount = renderedCount;
     const channelLinks: string[] = [];
-    let processedCount = 0;
 
     const targetDomain = 'targetDomain' in channelConfig ? channelConfig.targetDomain : '';
     const allowedDomains = channelConfig.allowedDomains || [targetDomain];
 
-    if (scope === ExtractionScope.UNREAD) {
-        const startIndex = unreadCount > 0 ? Math.max(0, renderedCount - unreadCount) : 0;
-        processedCount = renderedCount - startIndex;
-
-        for (let i = startIndex; i < renderedCount; i++) {
-            const msg = rawMessages[i];
-            if (msg) {
-                for (const rawLink of msg.rawLinks) {
-                    const link = cleanExtractedUrl(rawLink);
-                    if (isMatchingDomain(link, { targetDomain, allowedDomains })) {
-                        channelLinks.push(link);
-                    }
-                }
-            }
-        }
-    } else if (scope === ExtractionScope.TODAY) {
-        for (const msg of rawMessages) {
-            const isToday =
-                isDateToday(msg.dateSection) ||
-                isDateToday(msg.prePlainText) ||
-                (!msg.dateSection && !isDateYesterday(msg.prePlainText) && !msg.prePlainText.includes('/'));
-
-            if (isToday) {
-                processedCount++;
-                for (const rawLink of msg.rawLinks) {
-                    const link = cleanExtractedUrl(rawLink);
-                    if (isMatchingDomain(link, { targetDomain, allowedDomains })) {
-                        channelLinks.push(link);
-                    }
-                }
-            }
-        }
-    } else if (scope === ExtractionScope.YESTERDAY) {
-        for (const msg of rawMessages) {
-            const isYesterday =
-                isDateYesterday(msg.dateSection) ||
-                isDateYesterday(msg.prePlainText);
-
-            if (isYesterday) {
-                processedCount++;
-                for (const rawLink of msg.rawLinks) {
-                    const link = cleanExtractedUrl(rawLink);
-                    if (isMatchingDomain(link, { targetDomain, allowedDomains })) {
-                        channelLinks.push(link);
-                    }
-                }
+    for (const msg of rawMessages) {
+        for (const rawLink of msg.rawLinks) {
+            const link = cleanExtractedUrl(rawLink);
+            if (isMatchingDomain(link, { targetDomain, allowedDomains })) {
+                channelLinks.push(link);
             }
         }
     }
@@ -969,6 +482,7 @@ export async function extractChannelBroadcastLinks(
         links: Array.from(new Set(channelLinks)),
         renderedCount,
         processedCount,
+        stats,
     };
 }
 
@@ -1152,21 +666,27 @@ export async function scrapeWhatsAppJobLinks(
                         unreadCount: scope === "unread" ? unreadCount : undefined,
                     });
 
-                    const rawMessages = await collectAllScopeMessages(page, scope, unreadCount);
+                    const { messages: rawMessages, stats } = await collectScopeMessagesWithStats(page, scope, unreadCount);
                     const renderedCount = rawMessages.length;
 
                     if (renderedCount === 0) {
+                        // A chat that rendered but has nothing in scope is a skip, not a failure.
+                        const chatRendered = stats.totalMessages > 0;
                         const noMessagesResult: SourceScrapeResult = {
                             sourceName: source.name,
                             sourceType: "group",
                             targetDomain: source.targetDomain,
-                            status: "warning",
+                            status: chatRendered ? "skipped" : "warning",
                             messagesRendered: 0,
                             extractedLinks: [],
-                            warning: "No messages rendered in conversation panel",
+                            warning: describeEmptyScope(scope, stats),
                         };
                         sourceResults.push(noMessagesResult);
-                        failedSources++;
+                        if (chatRendered) {
+                            skippedSources++;
+                        } else {
+                            failedSources++;
+                        }
                         emit({
                             type: "source_complete",
                             sourceType: "group",
@@ -1176,58 +696,16 @@ export async function scrapeWhatsAppJobLinks(
                         continue;
                     }
 
+                    // collectAllScopeMessages already returns only the messages inside the scope.
                     const groupLinks: string[] = [];
-                    let messagesProcessed = 0;
+                    const messagesProcessed = renderedCount;
 
-                    if (scope === "unread") {
-                        const startIndex = unreadCount > 0 ? Math.max(0, renderedCount - unreadCount) : 0;
-                        messagesProcessed = renderedCount - startIndex;
-
-                        for (let i = startIndex; i < renderedCount; i++) {
-                            const msg = rawMessages[i];
-                            if (msg) {
-                                for (const rawLink of msg.rawLinks) {
-                                    const link = cleanExtractedUrl(rawLink);
-                                    if (isMatchingDomain(link, source)) {
-                                        groupLinks.push(link);
-                                        allJobLinks.add(link);
-                                    }
-                                }
-                            }
-                        }
-                    } else if (scope === "today") {
-                        for (const msg of rawMessages) {
-                            const isToday =
-                                isDateToday(msg.dateSection) ||
-                                isDateToday(msg.prePlainText) ||
-                                (!msg.dateSection && !isDateYesterday(msg.prePlainText) && !msg.prePlainText.includes('/'));
-
-                            if (isToday) {
-                                messagesProcessed++;
-                                for (const rawLink of msg.rawLinks) {
-                                    const link = cleanExtractedUrl(rawLink);
-                                    if (isMatchingDomain(link, source)) {
-                                        groupLinks.push(link);
-                                        allJobLinks.add(link);
-                                    }
-                                }
-                            }
-                        }
-                    } else if (scope === "yesterday") {
-                        for (const msg of rawMessages) {
-                            const isYesterday =
-                                isDateYesterday(msg.dateSection) ||
-                                isDateYesterday(msg.prePlainText);
-
-                            if (isYesterday) {
-                                messagesProcessed++;
-                                for (const rawLink of msg.rawLinks) {
-                                    const link = cleanExtractedUrl(rawLink);
-                                    if (isMatchingDomain(link, source)) {
-                                        groupLinks.push(link);
-                                        allJobLinks.add(link);
-                                    }
-                                }
+                    for (const msg of rawMessages) {
+                        for (const rawLink of msg.rawLinks) {
+                            const link = cleanExtractedUrl(rawLink);
+                            if (isMatchingDomain(link, source)) {
+                                groupLinks.push(link);
+                                allJobLinks.add(link);
                             }
                         }
                     }
@@ -1322,12 +800,38 @@ export async function scrapeWhatsAppJobLinks(
                     });
 
                     // 3. Extract channel broadcast links
-                    const { links, renderedCount, processedCount } = await extractChannelBroadcastLinks(
+                    const { links, renderedCount, processedCount, stats } = await extractChannelBroadcastLinks(
                         page,
                         source,
                         scope,
                         unreadCount
                     );
+
+                    if (renderedCount === 0) {
+                        const chatRendered = stats.totalMessages > 0;
+                        const emptyResult: SourceScrapeResult = {
+                            sourceName: source.name,
+                            sourceType: "channel",
+                            targetDomain: source.targetDomain,
+                            status: chatRendered ? "skipped" : "warning",
+                            messagesRendered: 0,
+                            extractedLinks: [],
+                            warning: describeEmptyScope(scope, stats),
+                        };
+                        sourceResults.push(emptyResult);
+                        if (chatRendered) {
+                            skippedSources++;
+                        } else {
+                            failedSources++;
+                        }
+                        emit({
+                            type: "source_complete",
+                            sourceType: "channel",
+                            sourceName: source.name,
+                            result: emptyResult,
+                        });
+                        continue;
+                    }
 
                     for (const link of links) {
                         allJobLinks.add(link);

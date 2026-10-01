@@ -1,6 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
-import { openFollowedChannel, type SearchAndOpenResult } from "../../../src/scraper/whatsapp_scraper.js";
-import { WHATSAPP_LOCATORS, getCombinedSelector } from "../../../src/config/whatsapp_locators.js";
+import { openFollowedChannel, ExtractionScope, type SearchAndOpenResult } from "@/automations/whatsapp/whatsapp_scraper.js";
+import { WHATSAPP_LOCATORS, getCombinedSelector } from "@/automations/whatsapp/config/whatsapp_locators.js";
 import { highlightElement } from "../../helpers/dom-highlighter.js";
 
 const NON_EXISTENT_CHANNEL = "NonExistentChannel_TestXYZ_99999";
@@ -29,7 +29,7 @@ export function registerChannelUnreadTests(getContext: () => ChannelTestContext)
 
       let result!: SearchAndOpenResult;
       await test.step(`2. Execute openFollowedChannel(page, '${NON_EXISTENT_CHANNEL}', 'unread')`, async () => {
-        result = await openFollowedChannel(page, NON_EXISTENT_CHANNEL, "unread");
+        result = await openFollowedChannel(page, NON_EXISTENT_CHANNEL, ExtractionScope.UNREAD);
         await test.info().attach("channel-search-result", {
           body: JSON.stringify(result, null, 2),
           contentType: "application/json",
@@ -57,7 +57,7 @@ export function registerChannelUnreadTests(getContext: () => ChannelTestContext)
       test.skip(!isAuthenticated, "Requires authenticated WhatsApp session");
 
       await test.step(`1. Ensure target channel '${targetChannelName}' is active in conversation view`, async () => {
-        const openRes = await openFollowedChannel(page, targetChannelName, "today");
+        const openRes = await openFollowedChannel(page, targetChannelName, ExtractionScope.TODAY);
         if (openRes.status !== "opened") {
           test.skip(true, `Could not open target channel '${targetChannelName}' to test unread skip behavior`);
         }
@@ -67,7 +67,7 @@ export function registerChannelUnreadTests(getContext: () => ChannelTestContext)
 
       let unreadResult!: SearchAndOpenResult;
       await test.step(`2. Execute openFollowedChannel(page, '${targetChannelName}', 'unread') on active channel`, async () => {
-        unreadResult = await openFollowedChannel(page, targetChannelName, "unread");
+        unreadResult = await openFollowedChannel(page, targetChannelName, ExtractionScope.UNREAD);
         await test.info().attach("channel-search-result", {
           body: JSON.stringify(unreadResult, null, 2),
           contentType: "application/json",
@@ -96,7 +96,7 @@ export function registerChannelUnreadTests(getContext: () => ChannelTestContext)
 
       let result!: SearchAndOpenResult;
       await test.step(`1. Execute openFollowedChannel(page, '${targetChannelName}', 'unread')`, async () => {
-        result = await openFollowedChannel(page, targetChannelName, "unread");
+        result = await openFollowedChannel(page, targetChannelName, ExtractionScope.UNREAD);
         await test.info().attach("channel-search-result", {
           body: JSON.stringify(result, null, 2),
           contentType: "application/json",

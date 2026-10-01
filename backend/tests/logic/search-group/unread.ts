@@ -1,6 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
-import { searchAndOpenGroup, type SearchAndOpenResult } from "../../../src/scraper/whatsapp_scraper.js";
-import { WHATSAPP_LOCATORS, getCombinedSelector } from "../../../src/config/whatsapp_locators.js";
+import { searchAndOpenGroup, ExtractionScope, type SearchAndOpenResult } from "@/automations/whatsapp/whatsapp_scraper.js";
+import { WHATSAPP_LOCATORS, getCombinedSelector } from "@/automations/whatsapp/config/whatsapp_locators.js";
 import { highlightElement } from "../../helpers/dom-highlighter.js";
 
 const NON_EXISTENT_GROUP = "NonExistentGroup_TestXYZ_99999";
@@ -27,7 +27,7 @@ export function registerUnreadTests(getContext: () => TestContext): void {
 
       let result!: SearchAndOpenResult;
       await test.step(`2. Execute searchAndOpenGroup(page, '${NON_EXISTENT_GROUP}', 'unread')`, async () => {
-        result = await searchAndOpenGroup(page, NON_EXISTENT_GROUP, "unread");
+        result = await searchAndOpenGroup(page, NON_EXISTENT_GROUP, ExtractionScope.UNREAD);
         await test.info().attach("search-and-open-result", {
           body: JSON.stringify(result, null, 2),
           contentType: "application/json",
@@ -55,7 +55,7 @@ export function registerUnreadTests(getContext: () => TestContext): void {
       test.skip(!isAuthenticated, "Requires authenticated WhatsApp session");
 
       await test.step(`1. Ensure target group '${targetGroupName}' is active in header`, async () => {
-        const openRes = await searchAndOpenGroup(page, targetGroupName, "today");
+        const openRes = await searchAndOpenGroup(page, targetGroupName, ExtractionScope.TODAY);
         if (openRes.status !== "opened") {
           test.skip(true, `Could not open target group '${targetGroupName}' to test unread skip behavior`);
         }
@@ -65,7 +65,7 @@ export function registerUnreadTests(getContext: () => TestContext): void {
 
       let unreadResult!: SearchAndOpenResult;
       await test.step(`2. Execute searchAndOpenGroup(page, '${targetGroupName}', 'unread') on active chat`, async () => {
-        unreadResult = await searchAndOpenGroup(page, targetGroupName, "unread");
+        unreadResult = await searchAndOpenGroup(page, targetGroupName, ExtractionScope.UNREAD);
         await test.info().attach("search-and-open-result", {
           body: JSON.stringify(unreadResult, null, 2),
           contentType: "application/json",
@@ -99,7 +99,7 @@ export function registerUnreadTests(getContext: () => TestContext): void {
 
       let result!: SearchAndOpenResult;
       await test.step(`2. Execute searchAndOpenGroup(page, '${targetGroupName}', 'unread')`, async () => {
-        result = await searchAndOpenGroup(page, targetGroupName, "unread");
+        result = await searchAndOpenGroup(page, targetGroupName, ExtractionScope.UNREAD);
         await test.info().attach("search-and-open-result", {
           body: JSON.stringify(result, null, 2),
           contentType: "application/json",

@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { getAdminsHandler, getAdminByIdHandler, updateAdminHandler, deleteAdminHandler } from "../controllers/admin-controller.js";
-import { ensureAuthentication } from "../middlewares/auth.js";
+import { getAdminsHandler, getAdminByIdHandler, updateAdminHandler, deleteAdminHandler } from "@/controllers/admin-controller.js";
+import { ensureAuthentication } from "@/middlewares/auth.js";
 
 const router = Router();
 

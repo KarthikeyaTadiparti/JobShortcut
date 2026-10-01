@@ -1,8 +1,8 @@
 import type { Request, Response } from "express";
-import wrapAsync from "../utils/wrap-async.js";
-import { createJob, updateJob, checkApplyLinkExists, getJobsList } from "../services/job-services.js";
-import ExpressError from "../middlewares/errorhandler.js";
-import { normalizeJobUrl } from "../utils/normalize-url.js";
+import wrapAsync from "@/utils/wrap-async.js";
+import { createJob, updateJob, checkApplyLinkExists, getJobsList } from "@/services/job-services.js";
+import ExpressError from "@/middlewares/errorhandler.js";
+import { normalizeJobUrl } from "@/utils/normalize-url.js";
 
 const JOBS_PER_PAGE = 12;
 

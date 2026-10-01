@@ -2,8 +2,8 @@ import { test, expect, chromium, type BrowserContext, type Page } from "@playwri
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
-import { WHATSAPP_LOCATORS, getCombinedSelector } from "../../src/config/whatsapp_locators.js";
-import { DEFAULT_WHATSAPP_CHANNELS } from "../../src/config/whatsapp-sources.js";
+import { WHATSAPP_LOCATORS, getCombinedSelector } from "@/automations/whatsapp/config/whatsapp_locators.js";
+import { DEFAULT_WHATSAPP_CHANNELS } from "@/automations/whatsapp/config/whatsapp-sources.js";
 import { validateLocatorWithFallback } from "../helpers/locator-tester.js";
 import { printDiagnosticReport, type LocatorValidationResult } from "../helpers/reporter-formatter.js";
 import { waitForWhatsAppLoadingToComplete } from "../helpers/page-ready.js";

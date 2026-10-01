@@ -4,6 +4,10 @@
     // File Layout
     "rootDir": "./src",
     "outDir": "./dist",
+    // "@/x.js" -> "src/x.ts" (tsx and Playwright resolve this natively; `build` runs tsc-alias for dist/)
+    "paths": {
+      "@/*": ["./src/*"]
+    },
 
     // Environment Settings
     // See also https://aka.ms/tsconfig/module

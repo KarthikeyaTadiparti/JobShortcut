@@ -1,8 +1,8 @@
-import db from "../config/db.js";
-import { jobs } from "../schema/jobs-schema.js";
-import type { Job, NewJob } from "../schema/jobs-schema.js";
+import db from "@/config/db.js";
+import { jobs } from "@/schema/jobs-schema.js";
+import type { Job, NewJob } from "@/schema/jobs-schema.js";
 import { eq, ilike, or, and, not, desc, isNull, count } from "drizzle-orm";
-import { normalizeJobUrl } from "../utils/normalize-url.js";
+import { normalizeJobUrl } from "@/utils/normalize-url.js";
 
 
 /**

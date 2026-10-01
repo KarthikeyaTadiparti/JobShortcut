@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { WHATSAPP_LOCATORS } from "../../src/config/whatsapp_locators.js";
+import { WHATSAPP_LOCATORS } from "@/automations/whatsapp/config/whatsapp_locators.js";
 import { validateLocatorWithFallback } from "../helpers/locator-tester.js";
 import { printDiagnosticReport, type LocatorValidationResult } from "../helpers/reporter-formatter.js";
 import { waitForWhatsAppLoadingToComplete } from "../helpers/page-ready.js";

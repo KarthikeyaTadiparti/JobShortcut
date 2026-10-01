@@ -1,6 +1,6 @@
 import { test, type BrowserContext, type Page } from "@playwright/test";
-import { launchWhatsAppContext, checkWhatsAppAuthState } from "../../../src/scraper/whatsapp_session.js";
-import { DEFAULT_WHATSAPP_GROUPS } from "../../../src/config/whatsapp-sources.js";
+import { launchWhatsAppContext, checkWhatsAppAuthState } from "@/automations/whatsapp/whatsapp_session.js";
+import { DEFAULT_WHATSAPP_GROUPS } from "@/automations/whatsapp/config/whatsapp-sources.js";
 
 import { registerUnreadTests } from "./unread.js";
 import { registerTodayTests } from "./today.js";

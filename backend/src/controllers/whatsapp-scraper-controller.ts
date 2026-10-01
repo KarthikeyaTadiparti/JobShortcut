@@ -1,16 +1,16 @@
 import type { Request, Response } from "express";
-import wrapAsync from "../utils/wrap-async.js";
-import { initSSEStream } from "../utils/sse-stream.js";
-import { scrapeWhatsAppJobLinks } from "../scraper/whatsapp_scraper.js";
+import wrapAsync from "@/utils/wrap-async.js";
+import { initSSEStream } from "@/utils/sse-stream.js";
+import { scrapeWhatsAppJobLinks } from "@/automations/whatsapp/whatsapp_scraper.js";
 import {
     launchWhatsAppContext,
     checkWhatsAppAuthState,
-} from "../scraper/whatsapp_session.js";
+} from "@/automations/whatsapp/whatsapp_session.js";
 import {
     ExtractionScope,
     type WhatsAppSourceConfig,
     type WhatsAppScrapeOptions,
-} from "../scraper/whatsapp-types.js";
+} from "@/automations/whatsapp/whatsapp-types.js";
 
 /**
  * Controller to handle WhatsApp scraper requests with real-time SSE streaming.

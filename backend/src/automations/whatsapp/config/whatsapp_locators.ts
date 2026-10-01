@@ -53,6 +53,13 @@ export type LocatorKey =
   | "copyableText"
   | "dateDividerSpan"
   | "messageAnchorLink"
+  | "messageRow"
+  | "virtualizedPlaceholder"
+  | "quotedMessage"
+  | "readMoreBtn"
+  | "unreadDivider"
+  | "historyLoadingSpinner"
+  | "scrollToBottomBtn"
   | "channelsTabBtn"
   | "channelsListContainer"
   | "channelsSearchInput"
@@ -383,6 +390,105 @@ export const WHATSAPP_LOCATORS: Record<LocatorKey, LocatorDefinition> = {
       "#main div.copyable-text a[href]",
       "#main a[href]",
       'a[href^="http"]',
+    ],
+    isOptional: true,
+    requiresParent: "#main",
+  },
+
+  // ---------------------------------------------------------------------------
+  // VIRTUALIZED HISTORY HARVESTING
+  // ---------------------------------------------------------------------------
+  messageRow: {
+    id: "messageRow",
+    name: "Message Row With Stable Id",
+    category: "messages",
+    description: "Outermost element of a message carrying the stable data-id used as the merge key.",
+    primary: "#main [data-id]",
+    fallbacks: [
+      '#main div[role="row"] [data-id]',
+      '#main div[data-testid^="conv-msg-"]',
+      '#main div[data-testid="msg-container"]',
+      "#main .message-in",
+      "#main .message-out",
+    ],
+    requiresParent: "#main",
+  },
+  virtualizedPlaceholder: {
+    id: "virtualizedPlaceholder",
+    name: "Virtualized Message Placeholder",
+    category: "messages",
+    description: "Empty fixed-height shell WhatsApp renders inside an off-screen message row instead of its content.",
+    primary: '[data-virtualized="true"]',
+    fallbacks: [],
+    isOptional: true,
+    requiresParent: "#main",
+  },
+  quotedMessage: {
+    id: "quotedMessage",
+    name: "Quoted Reply Preview",
+    category: "messages",
+    description: "Quoted message preview inside a reply bubble; its text and links belong to another message.",
+    primary: '[data-testid="quoted-message"]',
+    fallbacks: [
+      '[aria-label*="Quoted message" i]',
+      '[aria-label*="quoted" i]',
+      ".quoted-mention",
+    ],
+    isOptional: true,
+    requiresParent: "#main",
+  },
+  readMoreBtn: {
+    id: "readMoreBtn",
+    name: "Read More Expander",
+    category: "messages",
+    description: "Inline button that expands a truncated long message body.",
+    primary: '#main [role="button"]',
+    fallbacks: [
+      "#main button",
+      "#main span[role='button']",
+      "#main div[role='button']",
+    ],
+    isOptional: true,
+    requiresParent: "#main",
+  },
+  unreadDivider: {
+    id: "unreadDivider",
+    name: "Unread Messages Divider",
+    category: "messages",
+    description: "In-chat divider reading 'N unread messages' placed above the first unread message.",
+    primary: '#main [aria-live] span',
+    fallbacks: [
+      "#main div[role='row'] span",
+      "#main span",
+    ],
+    isOptional: true,
+    requiresParent: "#main",
+  },
+  historyLoadingSpinner: {
+    id: "historyLoadingSpinner",
+    name: "Older History Loading Spinner",
+    category: "messages",
+    description: "Spinner shown at the top of the conversation while older messages are fetched.",
+    primary: '#main [role="progressbar"]',
+    fallbacks: [
+      "#main progress",
+      '#main [data-testid*="spinner" i]',
+      '#main [data-icon*="spinner" i]',
+      "#main svg circle[class*='spin' i]",
+    ],
+    isOptional: true,
+    requiresParent: "#main",
+  },
+  scrollToBottomBtn: {
+    id: "scrollToBottomBtn",
+    name: "Scroll To Bottom Button",
+    category: "messages",
+    description: "Floating button that jumps the conversation to the newest message.",
+    primary: '#main [aria-label="Scroll to bottom"]',
+    fallbacks: [
+      '#main [data-testid="scroll-to-bottom"]',
+      '#main span[data-icon="down"]',
+      '#main span[data-icon*="chevron-down" i]',
     ],
     isOptional: true,
     requiresParent: "#main",

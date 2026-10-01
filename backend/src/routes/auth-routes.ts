@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { handleAdminSignup, handleAdminLogin, handleAdminLogout } from "../controllers/auth-controller.js";
-import { loginValidation, signupValidation } from "../middlewares/auth.js";
+import { handleAdminSignup, handleAdminLogin, handleAdminLogout } from "@/controllers/auth-controller.js";
+import { loginValidation, signupValidation } from "@/middlewares/auth.js";
 
 const router = Router();
 

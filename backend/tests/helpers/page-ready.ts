@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test";
-import { WHATSAPP_LOCATORS, getCombinedSelector } from "../../src/config/whatsapp_locators.js";
+import { WHATSAPP_LOCATORS, getCombinedSelector } from "@/automations/whatsapp/config/whatsapp_locators.js";
 
 /**
  * Actively waits for WhatsApp Web's initial loading screen, progress bars,

@@ -1,0 +1,11 @@
+{
+  // Type-checks tests/ (and the src/ files they import) with the same strict options
+  // and "@/*" alias as ../tsconfig.json. Never emits; `npm run build` stays src-only.
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "..",
+    "noEmit": true,
+    "types": ["node"]
+  },
+  "include": ["./**/*", "../src/**/*"]
+}

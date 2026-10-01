@@ -18,7 +18,7 @@ export interface LocatorValidationResult {
 }
 
 export interface ValidationRunSummary {
-  suite: "auth" | "chat" | "all";
+  suite: "auth" | "chat" | "channel" | "all";
   timestamp: string;
   totalLocators: number;
   operationalCount: number;
@@ -32,7 +32,7 @@ export interface ValidationRunSummary {
  * Formats and prints a structured diagnostic locator health summary to stdout.
  */
 export function printDiagnosticReport(
-  suiteName: "auth" | "chat" | "all",
+  suiteName: "auth" | "chat" | "channel" | "all",
   results: LocatorValidationResult[],
   targetSessionPath = "backend/.whatsapp_session"
 ): ValidationRunSummary {
@@ -57,16 +57,7 @@ export function printDiagnosticReport(
   console.log("-".repeat(88));
 
   for (const r of results) {
-    let statusLabel = r.status;
-    if (r.status === "OPERATIONAL") {
-      statusLabel = "✅ OPERATIONAL";
-    } else if (r.status === "DEGRADED") {
-      statusLabel = "⚠️ DEGRADED";
-    } else if (r.status === "BROKEN") {
-      statusLabel = "❌ BROKEN";
-    } else if (r.status === "SKIPPED") {
-      statusLabel = "⚪ SKIPPED";
-    }
+    const statusLabel = `[${r.status}]`;
 
     const activeSel = r.workingSelector || "(none)";
     console.log(

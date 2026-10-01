@@ -1,5 +1,5 @@
 import { test, type Page, type Locator } from "@playwright/test";
-import type { LocatorDefinition } from "../../src/config/whatsapp_locators.js";
+import type { LocatorDefinition } from "@/automations/whatsapp/config/whatsapp_locators.js";
 import { highlightElement } from "./dom-highlighter.js";
 import type { LocatorValidationResult, FallbackAttempt } from "./reporter-formatter.js";
 

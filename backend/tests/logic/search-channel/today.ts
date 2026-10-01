@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
-import { openFollowedChannel, type SearchAndOpenResult } from "../../../src/scraper/whatsapp_scraper.js";
-import { WHATSAPP_LOCATORS, getCombinedSelector } from "../../../src/config/whatsapp_locators.js";
+import { openFollowedChannel, ExtractionScope, type SearchAndOpenResult } from "@/automations/whatsapp/whatsapp_scraper.js";
+import { WHATSAPP_LOCATORS, getCombinedSelector } from "@/automations/whatsapp/config/whatsapp_locators.js";
 import { highlightElement } from "../../helpers/dom-highlighter.js";
 import type { ChannelTestContext } from "./unread.js";
 
@@ -24,7 +24,7 @@ export function registerChannelTodayTests(getContext: () => ChannelTestContext):
 
       let result!: SearchAndOpenResult;
       await test.step(`2. Execute openFollowedChannel(page, '${NON_EXISTENT_CHANNEL}', 'today')`, async () => {
-        result = await openFollowedChannel(page, NON_EXISTENT_CHANNEL, "today");
+        result = await openFollowedChannel(page, NON_EXISTENT_CHANNEL, ExtractionScope.TODAY);
         await test.info().attach("channel-search-result", {
           body: JSON.stringify(result, null, 2),
           contentType: "application/json",
@@ -53,7 +53,7 @@ export function registerChannelTodayTests(getContext: () => ChannelTestContext):
 
       let result!: SearchAndOpenResult;
       await test.step(`1. Execute openFollowedChannel(page, '${targetChannelName}', 'today')`, async () => {
-        result = await openFollowedChannel(page, targetChannelName, "today");
+        result = await openFollowedChannel(page, targetChannelName, ExtractionScope.TODAY);
         await test.info().attach("channel-search-result", {
           body: JSON.stringify(result, null, 2),
           contentType: "application/json",
@@ -82,7 +82,7 @@ export function registerChannelTodayTests(getContext: () => ChannelTestContext):
       test.skip(!isAuthenticated, "Requires authenticated WhatsApp session");
 
       await test.step(`1. Ensure target channel '${targetChannelName}' is active in conversation view`, async () => {
-        const prepRes = await openFollowedChannel(page, targetChannelName, "today");
+        const prepRes = await openFollowedChannel(page, targetChannelName, ExtractionScope.TODAY);
         if (prepRes.status !== "opened") {
           test.skip(true, `Target channel '${targetChannelName}' could not be opened to test already-open behavior`);
         }
@@ -90,7 +90,7 @@ export function registerChannelTodayTests(getContext: () => ChannelTestContext):
 
       let alreadyOpenResult!: SearchAndOpenResult;
       await test.step(`2. Execute openFollowedChannel(page, '${targetChannelName}', 'today') on active channel`, async () => {
-        alreadyOpenResult = await openFollowedChannel(page, targetChannelName, "today");
+        alreadyOpenResult = await openFollowedChannel(page, targetChannelName, ExtractionScope.TODAY);
         await test.info().attach("channel-search-result", {
           body: JSON.stringify(alreadyOpenResult, null, 2),
           contentType: "application/json",

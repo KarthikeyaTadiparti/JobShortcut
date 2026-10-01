@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
-import { searchAndOpenGroup, type SearchAndOpenResult } from "../../../src/scraper/whatsapp_scraper.js";
-import { WHATSAPP_LOCATORS, getCombinedSelector } from "../../../src/config/whatsapp_locators.js";
+import { searchAndOpenGroup, ExtractionScope, type SearchAndOpenResult } from "@/automations/whatsapp/whatsapp_scraper.js";
+import { WHATSAPP_LOCATORS, getCombinedSelector } from "@/automations/whatsapp/config/whatsapp_locators.js";
 import { highlightElement } from "../../helpers/dom-highlighter.js";
 import type { TestContext } from "./unread.js";
 
@@ -22,7 +22,7 @@ export function registerTodayTests(getContext: () => TestContext): void {
 
       let result!: SearchAndOpenResult;
       await test.step(`2. Execute searchAndOpenGroup(page, '${NON_EXISTENT_GROUP}', 'today')`, async () => {
-        result = await searchAndOpenGroup(page, NON_EXISTENT_GROUP, "today");
+        result = await searchAndOpenGroup(page, NON_EXISTENT_GROUP, ExtractionScope.TODAY);
         await test.info().attach("search-and-open-result", {
           body: JSON.stringify(result, null, 2),
           contentType: "application/json",
@@ -56,7 +56,7 @@ export function registerTodayTests(getContext: () => TestContext): void {
 
       let result!: SearchAndOpenResult;
       await test.step(`2. Execute searchAndOpenGroup(page, '${targetGroupName}', 'today')`, async () => {
-        result = await searchAndOpenGroup(page, targetGroupName, "today");
+        result = await searchAndOpenGroup(page, targetGroupName, ExtractionScope.TODAY);
         await test.info().attach("search-and-open-result", {
           body: JSON.stringify(result, null, 2),
           contentType: "application/json",
@@ -86,7 +86,7 @@ export function registerTodayTests(getContext: () => TestContext): void {
 
       let alreadyOpenResult!: SearchAndOpenResult;
       await test.step(`1. Execute searchAndOpenGroup(page, '${targetGroupName}', 'today') on active chat`, async () => {
-        alreadyOpenResult = await searchAndOpenGroup(page, targetGroupName, "today");
+        alreadyOpenResult = await searchAndOpenGroup(page, targetGroupName, ExtractionScope.TODAY);
         await test.info().attach("search-and-open-result", {
           body: JSON.stringify(alreadyOpenResult, null, 2),
           contentType: "application/json",

@@ -6,17 +6,19 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "start": "node dist/server.js",
-    "build": "tsc",
+    "build": "tsc && tsc-alias",
     "db:studio": "drizzle-kit studio",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
-    "scrape": "tsx src/scraper/index.ts",
-    "scrape:whatsapp": "tsx src/scraper/whatsapp_cli.ts",
-    "auth:whatsapp": "tsx src/scripts/whatsapp_auth.ts",
+    "scrape": "tsx src/automations/scraper/index.ts",
+    "scrape:whatsapp": "tsx src/automations/whatsapp/whatsapp_cli.ts",
+    "auth:whatsapp": "tsx src/automations/whatsapp/whatsapp_auth.ts",
     "test:locators": "playwright test tests/locator",
     "test:logic": "playwright test tests/logic",
-    "test:report": "playwright show-report"
+    "test:report": "playwright show-report",
+    "typecheck": "tsc --noEmit && tsc -p tests",
+    "lint": "tsc --noEmit && tsc -p tests"
   },
   "keywords": [],
   "author": "",
@@ -50,6 +52,7 @@
     "drizzle-kit": "^0.31.10",
     "nodemon": "^3.1.14",
     "ts-node": "^10.9.2",
+    "tsc-alias": "^1.9.7",
     "tsx": "^4.22.4",
     "typescript": "^6.0.3"
   }

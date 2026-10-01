@@ -3,7 +3,7 @@ import {
     checkWhatsAppAuthState,
     waitForWhatsAppLogin,
     getDefaultWhatsAppSessionDir
-} from "../scraper/whatsapp_session.js";
+} from "./whatsapp_session.js";
 
 export interface WhatsAppAuthResult {
     authenticated: boolean;
@@ -41,7 +41,7 @@ export async function ensureWhatsAppAuth(options: {
         });
 
         // Check if session is already authenticated or showing QR code
-        const authState = await checkWhatsAppAuthState(page, 20000);
+        const authState = await checkWhatsAppAuthState(page, 45000);
 
         if (authState.authenticated) {
             console.log("[AUTHENTICATED] WhatsApp session is already active and authenticated!");
@@ -52,28 +52,37 @@ export async function ensureWhatsAppAuth(options: {
             };
         }
 
-        // Session not authenticated - user needs to scan QR code
-        console.log("[SESSION EXPIRED / NOT LOGGED IN]");
-        console.log("Please scan the QR code displayed in the browser window using WhatsApp on your phone (Linked Devices).");
-        console.log(`Waiting up to ${Math.round(timeoutMs / 1000)}s for scan completion...\n`);
+        if (authState.qrDetected || authState.qrDataUrl) {
+            // Session not authenticated - user needs to scan QR code
+            console.log("[SESSION EXPIRED / NOT LOGGED IN]");
+            console.log("Please scan the QR code displayed in the browser window using WhatsApp on your phone (Linked Devices).");
+            console.log(`Waiting up to ${Math.round(timeoutMs / 1000)}s for scan completion...\n`);
 
-        const loginSuccess = await waitForWhatsAppLogin(page, timeoutMs);
+            const loginSuccess = await waitForWhatsAppLogin(page, timeoutMs);
 
-        if (loginSuccess) {
-            // Give session state 2 seconds to flush cookies and storage to disk
-            await page.waitForTimeout(2000);
-            console.log("[SUCCESS] QR code scanned successfully! Session is now authenticated and saved.");
-            return {
-                authenticated: true,
-                sessionDir,
-                message: "QR code scanned successfully. Session updated.",
-            };
+            if (loginSuccess) {
+                // Give session state 2 seconds to flush cookies and storage to disk
+                await page.waitForTimeout(2000);
+                console.log("[SUCCESS] QR code scanned successfully! Session is now authenticated and saved.");
+                return {
+                    authenticated: true,
+                    sessionDir,
+                    message: "QR code scanned successfully. Session updated.",
+                };
+            } else {
+                console.error("[TIMEOUT] Authentication timed out. QR code was not scanned in time.");
+                return {
+                    authenticated: false,
+                    sessionDir,
+                    message: "Authentication timed out waiting for QR code scan.",
+                };
+            }
         } else {
-            console.error("[TIMEOUT] Authentication timed out. QR code was not scanned in time.");
+            console.error("[ERROR] WhatsApp loading timed out before establishing session state. Please check your internet connection.");
             return {
                 authenticated: false,
                 sessionDir,
-                message: "Authentication timed out waiting for QR code scan.",
+                message: "WhatsApp session check timed out without loading chat list or QR code.",
             };
         }
     } catch (error: any) {

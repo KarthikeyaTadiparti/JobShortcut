@@ -1,8 +1,8 @@
 import { Router } from "express";
-import { handleScrapeRequest } from "../controllers/scraper-controller.js";
-import { handleWhatsAppScrape, handleWhatsAppStatus } from "../controllers/whatsapp-scraper-controller.js";
-import { ensureAuthentication } from "../middlewares/auth.js";
-import { validateScraperUrls, validateWhatsAppScope } from "../middlewares/scraper-validation.js";
+import { handleScrapeRequest } from "@/controllers/scraper-controller.js";
+import { handleWhatsAppScrape, handleWhatsAppStatus } from "@/controllers/whatsapp-scraper-controller.js";
+import { ensureAuthentication } from "@/middlewares/auth.js";
+import { validateScraperUrls, validateWhatsAppScope } from "@/middlewares/scraper-validation.js";
 
 const router = Router();
 

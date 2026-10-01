@@ -1,6 +1,6 @@
 import { test, type BrowserContext, type Page } from "@playwright/test";
-import { launchWhatsAppContext, checkWhatsAppAuthState } from "../../../src/scraper/whatsapp_session.js";
-import { DEFAULT_WHATSAPP_GROUPS, DEFAULT_WHATSAPP_CHANNELS } from "../../../src/config/whatsapp-sources.js";
+import { launchWhatsAppContext, checkWhatsAppAuthState } from "@/automations/whatsapp/whatsapp_session.js";
+import { DEFAULT_WHATSAPP_GROUPS, DEFAULT_WHATSAPP_CHANNELS } from "@/automations/whatsapp/config/whatsapp-sources.js";
 
 import { registerSearchGroupIterationTests } from "./search-group-iteration.js";
 import { registerSearchChannelIterationTests } from "./search-channel-iteration.js";

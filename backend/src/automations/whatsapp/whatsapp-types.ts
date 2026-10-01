@@ -3,7 +3,7 @@ import type {
     WhatsAppSourceConfig,
     WhatsAppGroupConfig,
     WhatsAppChannelConfig,
-} from "../config/whatsapp-sources.js";
+} from "./config/whatsapp-sources.js";
 
 export type {
     WhatsAppSourceType,
@@ -16,6 +16,23 @@ export enum ExtractionScope {
     UNREAD = 'unread',
     TODAY = 'today',
     YESTERDAY = 'yesterday',
+}
+
+/**
+ * A single conversation message harvested from the WhatsApp Web DOM.
+ */
+export interface RawMessageData {
+    dataId?: string | undefined;
+    /** Stable merge key (data-id when available). */
+    key?: string | undefined;
+    rawLinks: string[];
+    text: string;
+    prePlainText: string;
+    /** Label of the nearest date divider above the message (e.g. "TODAY"). */
+    dateSection: string;
+    /** Resolved local calendar date as YYYY-MM-DD, when known. */
+    date?: string | undefined;
+    kind?: 'text' | 'media' | 'other' | undefined;
 }
 
 export interface WhatsAppScrapeOptions {

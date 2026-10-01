@@ -2,18 +2,24 @@ import { scrapeWhatsAppJobLinks } from "./whatsapp_scraper.js";
 import { ExtractionScope } from "./whatsapp-types.js";
 
 async function main() {
-    // Support positional or flag args: --scope=today or today
-    const rawArg = process.argv.slice(2).find((a) => !a.startsWith("-")) ||
-        process.argv.slice(2).find((a) => a.startsWith("--scope="))?.split("=")[1] ||
-        "unread";
+    // Supported forms:
+    //   npm run scrape:whatsapp -- today          (positional)
+    //   npm run scrape:whatsapp -- --scope=today  (flag after --)
+    //   npm run scrape:whatsapp --scope=today     (npm consumes the flag and exposes it as npm_config_scope)
+    const args = process.argv.slice(2);
+    const rawArg =
+        args.find((a) => !a.startsWith("-")) ||
+        args.find((a) => a.startsWith("--scope="))?.split("=")[1] ||
+        process.env.npm_config_scope ||
+        ExtractionScope.UNREAD;
 
     const normalizedArg = rawArg.toLowerCase().trim();
-    let scope: ExtractionScope = ExtractionScope.UNREAD;
-    if (normalizedArg === "today") {
-        scope = ExtractionScope.TODAY;
-    } else if (normalizedArg === "yesterday") {
-        scope = ExtractionScope.YESTERDAY;
+    const validScopes = Object.values(ExtractionScope) as string[];
+    if (!validScopes.includes(normalizedArg)) {
+        console.error(`[ERROR] Unknown scope '${rawArg}'. Use one of: ${validScopes.join(", ")}`);
+        process.exit(1);
     }
+    const scope = normalizedArg as ExtractionScope;
 
     console.log(`\n=================== WHATSAPP JOB LINK SCRAPER ===================`);
     console.log(`Scope: ${scope.toUpperCase()}`);

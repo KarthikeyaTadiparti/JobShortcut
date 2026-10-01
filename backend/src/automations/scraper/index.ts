@@ -8,7 +8,7 @@ import { extractJobLinks as scrapeFreshersHunt } from "./freshers_hunt_scraper.j
 import { extractJobLinks as scrapeDailyPharma } from "./dailypharmajobs_scraper.js";
 import { extractJobLinks as scrapeFoundTheJob } from "./found_the_job_scraper.js";
 import { extractJobLinks as scrapeFreshersDunia } from "./freshers_dunia_scraper.js";
-import { checkApplyLinkExists } from "../services/job-services.js";
+import { checkApplyLinkExists } from "@/services/job-services.js";
 
 export interface ScrapedJob {
   company: string | null;
