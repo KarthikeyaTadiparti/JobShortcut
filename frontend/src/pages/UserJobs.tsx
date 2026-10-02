@@ -437,7 +437,7 @@ function UserJobs() {
                                                 href={job.applyLink}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
-                                                className="block w-full text-center bg-[#FCFAFF] text-[#5B3DF5] hover:bg-[#5B3DF5] hover:text-white py-3 rounded-xl font-bold text-xs border border-[#EBE3FF] transition-all duration-300 cursor-pointer active:scale-95"
+                                                className="block w-full text-center bg-[#5B3DF5] text-white hover:bg-[#4a2ee0] py-3 rounded-xl font-bold text-xs shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer active:scale-95"
                                             >
                                                 Apply Now
                                             </a>
