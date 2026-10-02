@@ -211,6 +211,15 @@ const AUTH_SELECTOR = `${getCombinedSelector(WHATSAPP_LOCATORS.chatListContainer
  */
 const QR_SELECTOR = 'canvas[aria-label*="Scan"], div[data-ref] canvas, [data-testid="qrcode"], div[data-testid="link-device-qr-code"]';
 
+/** WhatsApp's splash/progress screen while it syncs chats; neither the chat list nor a QR code is shown yet. */
+const LOADING_SELECTOR = getCombinedSelector(WHATSAPP_LOCATORS.loadingProgressBar);
+
+/**
+ * Longest total wait while WhatsApp keeps showing its loading screen. Syncing a large account
+ * can take well over 20 seconds, and giving up then is a false "not logged in".
+ */
+const MAX_LOADING_WAIT_MS = 120000;
+
 /**
  * True when at least one element matching the selector is rendered and visible.
  * Checking only `.first()` is unreliable: the first DOM match can be a hidden element.
@@ -238,6 +247,8 @@ async function captureQr(page: Page): Promise<string | undefined> {
 
 /**
  * Checks if the page is currently logged into WhatsApp Web or showing the QR code.
+ * `timeoutMs` is how long to wait for either screen; while WhatsApp is still on its loading
+ * screen the wait is extended (up to MAX_LOADING_WAIT_MS) instead of giving up.
  */
 export async function checkWhatsAppAuthState(page: Page, timeoutMs = 45000): Promise<WhatsAppAuthState> {
     try {
@@ -252,7 +263,7 @@ export async function checkWhatsAppAuthState(page: Page, timeoutMs = 45000): Pro
 
         // Race between chat-list / navigation and QR code
         const startTime = Date.now();
-        while (Date.now() - startTime < timeoutMs) {
+        while (true) {
             if (await isAnyVisible(page, AUTH_SELECTOR)) {
                 return { authenticated: true, qrDetected: false };
             }
@@ -265,12 +276,11 @@ export async function checkWhatsAppAuthState(page: Page, timeoutMs = 45000): Pro
                 };
             }
 
-            await page.waitForTimeout(500);
-        }
+            const elapsed = Date.now() - startTime;
+            const stillLoading = await isAnyVisible(page, LOADING_SELECTOR);
+            if (elapsed >= (stillLoading ? MAX_LOADING_WAIT_MS : timeoutMs)) break;
 
-        // Final check after timeout
-        if (await isAnyVisible(page, AUTH_SELECTOR)) {
-            return { authenticated: true, qrDetected: false };
+            await page.waitForTimeout(500);
         }
 
         return { authenticated: false, qrDetected: false };

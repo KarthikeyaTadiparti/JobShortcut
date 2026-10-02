@@ -105,7 +105,11 @@ export async function scrapeWhatsAppJobLinks(
                     throw new Error("WhatsApp Web authentication timed out. Scan QR code to proceed.");
                 }
             } else {
-                throw new Error("Unable to locate WhatsApp Web chat list or QR code.");
+                const pageTitle = await page.title().catch(() => "unknown");
+                throw new Error(
+                    `Unable to locate WhatsApp Web chat list or QR code (page title: '${pageTitle}'). ` +
+                    "WhatsApp may be stuck loading, showing an unsupported-browser or other-window screen, or its layout changed."
+                );
             }
         }
 

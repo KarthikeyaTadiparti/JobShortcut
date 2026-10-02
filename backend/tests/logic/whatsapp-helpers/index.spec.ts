@@ -13,7 +13,7 @@ import {
     type HarvestItem,
 } from "@/automations/whatsapp/helpers/whatsapp_message_merge.js";
 import { evaluateWindowMessages, type HarvestStats } from "@/automations/whatsapp/helpers/whatsapp_harvester.js";
-import { launchWhatsAppContext, WhatsAppSessionBusyError } from "@/automations/whatsapp/whatsapp_session.js";
+import { launchWhatsAppContext, checkWhatsAppAuthState, WhatsAppSessionBusyError } from "@/automations/whatsapp/whatsapp_session.js";
 import { highlightElement } from "../../helpers/dom-highlighter.js";
 
 const msg = (id: string, prePlainText: string): HarvestItem => ({
@@ -168,6 +168,41 @@ test.describe("WhatsApp helper logic (offline)", { tag: ["@logic", "@offline"] }
             for (const r of received) {
                 expect(r.links, `${r.domain}: only job-post URLs may survive; homepages, /whatsapp, /telegram, category and non-matching paths must be dropped`).toEqual(r.expected);
             }
+        });
+    });
+
+    test("Auth check keeps waiting while WhatsApp shows its loading screen", async ({ page }) => {
+        const loadingThenChats =
+            "<body><progress></progress><script>setTimeout(function(){document.body.innerHTML='<div id=\"side\" style=\"width:200px;height:200px\">chats</div>'},3000)</script></body>";
+        const nothingRecognised = "<body><h2>Some other screen</h2></body>";
+        const serve = async (html: string) => {
+            await page.unroute("https://web.whatsapp.com/**");
+            await page.route("https://web.whatsapp.com/**", (route) => route.fulfill({ contentType: "text/html", body: html }));
+            await page.goto("https://web.whatsapp.com/");
+        };
+
+        let slow: Awaited<ReturnType<typeof checkWhatsAppAuthState>> | undefined;
+        await test.step("Open a WhatsApp page that stays on the loading screen for 3s, with a 1s wait budget", async () => {
+            await serve(loadingThenChats);
+            await highlightElement(page.locator("progress"));
+            slow = await checkWhatsAppAuthState(page, 1000);
+        });
+
+        let unknown: Awaited<ReturnType<typeof checkWhatsAppAuthState>> | undefined;
+        let unknownMs = 0;
+        await test.step("Open a page with no chat list, QR code or loading screen, with a 1s wait budget", async () => {
+            await serve(nothingRecognised);
+            const started = Date.now();
+            unknown = await checkWhatsAppAuthState(page, 1000);
+            unknownMs = Date.now() - started;
+        });
+
+        await test.info().attach("auth-check-results", { body: JSON.stringify({ slow, unknown, unknownMs }, null, 2), contentType: "application/json" });
+
+        await test.step(`Validate outcome -> Expected: { slowAuthenticated: true, unknownAuthenticated: false, unknownWithin: 5000ms } | Received: { slowAuthenticated: ${slow?.authenticated}, unknownAuthenticated: ${unknown?.authenticated}, unknownMs: ${unknownMs} }`, async () => {
+            expect(slow?.authenticated, "A page still on WhatsApp's loading screen must be waited out, not reported as not logged in").toBe(true);
+            expect(unknown?.authenticated, "A page with no chat list must not count as logged in").toBe(false);
+            expect(unknownMs, "With no loading screen visible, the check must give up near the 1s budget instead of waiting up to the loading limit").toBeLessThan(5000);
         });
     });
 
