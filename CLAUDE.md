@@ -2,21 +2,6 @@
 
 Job aggregation portal. Scrapes cluttered third-party job blogs (and WhatsApp groups/channels that announce them), extracts company/role/experience/location plus the one direct apply link, and lets admins review and publish clean listings for job seekers.
 
-## Console Output Standards
-
-1. **No Emojis in Console Logs**: Do not use emojis anywhere in console messages, errors, warnings, or terminal logging across the codebase. Use clean text markers like `[INFO]`, `[SUCCESS]`, `[WARNING]`, `[ERROR]`, `[AUTHENTICATED]`, `[SKIPPED]`, `[TIMEOUT]`.
-2. **No Console Logs in Test Files**: Do not add `console.log`, `console.warn`, or `console.error` inside test files (`*.spec.ts`, `*.test.ts`). Tests must rely strictly on test framework assertions (`expect`).
-
-## Playwright Test Structure & Traceability
-
-1. **Group Actions into `test.step`**: Wrap actions and logical test phases inside descriptive `test.step("...", async () => { ... })` blocks so that Playwright Traces and HTML reports are structured, grouped, and easily traceable.
-2. **Visual Element Highlighting**: Use `highlightElement(locator)` to spotlight target elements (search boxes, chat rows, headers) before actions or assertions, ensuring high-contrast visibility in Playwright traces, screenshots, and video recordings.
-3. **Transparent Assertion Reporting (Expected vs. Received)**:
-   - Structure validation step headers with dynamic values:
-     `Validate outcome -> Expected: { status: '...', unreadCount: ... } | Received: { status: '${result?.status}', unreadCount: ${result?.unreadCount} }`
-   - Include custom explanatory messages in `expect(actual, "Explanation message")` explaining what business condition is validated.
-4. **Structured Test Attachments**: Attach structured test payload results via `test.info().attach("search-and-open-result", { body: JSON.stringify(result, null, 2), contentType: "application/json" })` so results are directly inspectable in the Playwright HTML report and Trace Viewer.
-
 ## Stack
 
 - **Backend** (`backend/`): Node.js ESM, Express 5, TypeScript (`tsx` in dev, `tsc` for prod), Drizzle ORM on Postgres (Neon), Playwright for scraping, zod for validation, JWT in HTTP-only cookies.
@@ -26,9 +11,9 @@ Job aggregation portal. Scrapes cluttered third-party job blogs (and WhatsApp gr
 
 - `backend/src/{routes,middlewares,controllers,services,schema}/` -- layered API
 - `backend/src/automations/scraper/` -- one module per job site, routed by `index.ts`
-- `backend/src/automations/whatsapp/` -- WhatsApp Web scraper (`whatsapp_scraper.ts`, session, harvester, CLI, auth script)
-- `backend/src/automations/whatsapp/helpers/` -- reusable WhatsApp utilities: navigation (`whatsapp_navigation.ts`), link filtering (`whatsapp_links.ts`), search candidates, empty-scope reporting, and the pure message-merge/date logic (`whatsapp_message_merge.ts`)
-- `backend/src/automations/whatsapp/config/` -- `whatsapp-sources.ts` (which groups/channels to scrape) and `whatsapp_locators.ts` (WhatsApp DOM selectors)
+- `backend/src/automations/whatsapp/` -- WhatsApp Web scraper: main workflow (`whatsapp_scraper.ts`), browser session and lock (`whatsapp_session.ts`), CLI, auth script, shared types
+- `backend/src/automations/whatsapp/helpers/` -- everything except the main workflow in `whatsapp_scraper.ts`: finding/opening chats and channels (`whatsapp_open_chat.ts`), reading messages (`whatsapp_messages.ts`) via the scroll-and-merge scan engine (`whatsapp_harvester.ts`), link filtering and extraction (`whatsapp_links.ts`), navigation (`whatsapp_navigation.ts`), name matching and search candidates (`whatsapp_search.ts`), result reporting (`whatsapp_scope_report.ts`), and the pure message-merge/date logic (`whatsapp_message_merge.ts`)
+- `backend/src/automations/whatsapp/config/` -- `whatsapp_sources.ts` (which groups/channels to scrape) and `whatsapp_locators.ts` (WhatsApp DOM selectors)
 - `backend/tests/locator/` -- selector health checks; `backend/tests/logic/` -- scraper logic tests; `backend/tests/helpers/` -- shared helpers
 - `frontend/src/{pages,components,api,redux}/` -- UI, fetch client, auth store
 - `specs/NNN-*/` and `.specify/memory/constitution.md` -- Spec Kit feature specs and the project constitution
@@ -42,12 +27,12 @@ Run from the repo root (they proxy to `backend/` or `frontend/`) unless noted.
 npm run server                  # backend dev server (port 3000)
 npm run client                  # frontend dev server (port 5173)
 npm run studio                  # Drizzle Studio
-npm run scrape:whatsapp -- today   # WhatsApp scrape; scope: unread | today | yesterday
-cd backend && npm run auth:whatsapp   # one-time QR login, saves session to backend/.whatsapp_session/
-cd backend && npm run scrape          # interactive multi-URL scraper CLI
-cd backend && npm run typecheck       # tsc --noEmit (backend "lint" is the same)
-cd backend && npm run test:locators   # Playwright vs live WhatsApp Web
-cd backend && npm run test:logic      # Playwright vs live WhatsApp Web
+npm run whatsapp -- today        # WhatsApp scrape; scope: unread | today | yesterday
+npm run whatsapp:auth             # one-time QR login, saves session to backend/.whatsapp_session/
+npm run scrape                     # interactive multi-URL scraper CLI
+npm run typecheck                  # tsc --noEmit for src and tests (backend "lint" is the same)
+npm run test:locators              # Playwright vs live WhatsApp Web
+npm run test:logic                 # Playwright vs live WhatsApp Web (npm run test:report opens the HTML report)
 cd backend && npm run db:generate && npm run db:migrate   # schema change -> migration
 cd frontend && npm run lint && npm run build              # eslint, then tsc -b + vite build
 ```
@@ -68,13 +53,15 @@ cd frontend && npm run lint && npm run build              # eslint, then tsc -b 
 
 **Add a job-site scraper:** create `backend/src/automations/scraper/<site>_scraper.ts` exporting `extractJobLinks(url)` returning `ScrapedJob`, add a hostname branch in `scrapeUrl` in `automations/scraper/index.ts`, then verify against a live URL with `npm run scrape` before finishing.
 
-**Add or change a WhatsApp source:** edit `automations/whatsapp/config/whatsapp-sources.ts` (set `type`, exact `name`, `targetDomain`, `allowedDomains`). If selectors break, update `automations/whatsapp/config/whatsapp_locators.ts` and re-run `test:locators`.
+**Add or change a WhatsApp source:** edit `automations/whatsapp/config/whatsapp_sources.ts` (set `type`, exact `name`, `targetDomain`, `allowedDomains`; add `jobPathPattern` only if the site has a stable job URL shape). Homepages and non-job paths like `/whatsapp` are dropped automatically in `helpers/whatsapp_links.ts`. If selectors break, update `automations/whatsapp/config/whatsapp_locators.ts` and re-run `test:locators`.
 
 **Schema change:** edit `backend/src/schema/*.ts`, `npm run db:generate`, review the SQL in `backend/drizzle/`, then `db:migrate`.
 
 ## Notes
 
 - WhatsApp tests and scrapes hit live WhatsApp Web and need a logged-in session; they are slow (90s timeout, 1 worker) and can break when WhatsApp changes its DOM. Don't run them unprompted.
+- Only one automation can use the WhatsApp session at a time: `launchWhatsAppContext` takes a lock (`backend/.whatsapp_session/automation.lock`), so a second launch (CLI, server request, or test run) fails with `WhatsAppSessionBusyError` instead of kicking the first one out of WhatsApp Web.
+- The `unread` scope is one-shot: opening a chat marks its messages read in WhatsApp, so if a run fails after opening a chat, those messages will not be unread next time. Re-run with `today` to recover them.
 - The scraper browser session lives in `backend/.whatsapp_session/` (gitignored). Never commit it or `.env` files.
 - Dev machine is Windows; use forward-slash-safe, cross-platform commands in scripts.
 

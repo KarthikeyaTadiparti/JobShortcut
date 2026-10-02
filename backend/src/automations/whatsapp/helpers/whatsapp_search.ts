@@ -29,3 +29,37 @@ export function getSearchCandidates(name: string): string[] {
 
     return candidates;
 }
+
+/**
+ * Normalizes a chat title for comparison: unified dashes, no non-breaking/zero-width
+ * spaces, collapsed whitespace, lowercase. Mirrored inside page.evaluate() callbacks.
+ */
+export function normalizeChatName(name: string): string {
+    return name
+        .replace(/[\u2013\u2014\u2212]/g, "-")
+        .replace(/[\u00A0\u2000-\u200B]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim()
+        .toLowerCase();
+}
+
+/**
+ * How well a chat title matches a configured source name:
+ * 3 = identical, 2 = title contains the full name, 1 = title equals a search candidate
+ * (e.g. the name without its "39 -" prefix), 0 = no match. Never matches on message
+ * previews or partial words, so "Fresher Openings - 85" is not "Fresher Openings - 86".
+ */
+export function chatNameMatchLevel(title: string, sourceName: string): number {
+    const actual = normalizeChatName(title);
+    const expected = normalizeChatName(sourceName);
+    if (!actual || !expected) return 0;
+    if (actual === expected) return 3;
+    if (actual.includes(expected)) return 2;
+    const candidates = getSearchCandidates(sourceName).map(normalizeChatName);
+    return candidates.some((c) => c.length >= 4 && actual === c) ? 1 : 0;
+}
+
+/** True when the title belongs to the configured source (any match level). */
+export function isSameChatName(title: string, sourceName: string): boolean {
+    return chatNameMatchLevel(title, sourceName) > 0;
+}

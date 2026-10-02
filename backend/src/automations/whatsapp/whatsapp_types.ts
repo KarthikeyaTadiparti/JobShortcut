@@ -3,7 +3,7 @@ import type {
     WhatsAppSourceConfig,
     WhatsAppGroupConfig,
     WhatsAppChannelConfig,
-} from "./config/whatsapp-sources.js";
+} from "./config/whatsapp_sources.js";
 
 export type {
     WhatsAppSourceType,

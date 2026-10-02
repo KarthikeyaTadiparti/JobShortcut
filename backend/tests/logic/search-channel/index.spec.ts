@@ -1,7 +1,7 @@
 import { test, type BrowserContext, type Page } from "@playwright/test";
 import { launchWhatsAppContext, checkWhatsAppAuthState } from "@/automations/whatsapp/whatsapp_session.js";
 import { navigateToChannelsTab } from "@/automations/whatsapp/helpers/whatsapp_navigation.js";
-import { DEFAULT_WHATSAPP_CHANNELS } from "@/automations/whatsapp/config/whatsapp-sources.js";
+import { DEFAULT_WHATSAPP_CHANNELS } from "@/automations/whatsapp/config/whatsapp_sources.js";
 
 import { registerChannelUnreadTests } from "./unread.js";
 import { registerChannelTodayTests } from "./today.js";

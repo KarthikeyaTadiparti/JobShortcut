@@ -2,14 +2,12 @@ import { test, expect, type Page } from "@playwright/test";
 import {
   searchAndOpenGroup,
   openFollowedChannel,
-  collectScopeMessagesWithStats,
-  ExtractionScope,
-  type RawMessageData,
   type SearchAndOpenResult,
-} from "@/automations/whatsapp/whatsapp_scraper.js";
+} from "@/automations/whatsapp/helpers/whatsapp_open_chat.js";
+import { collectScopeMessagesWithStats, type HarvestStats } from "@/automations/whatsapp/helpers/whatsapp_harvester.js";
+import { ExtractionScope, type RawMessageData } from "@/automations/whatsapp/whatsapp_types.js";
 import { navigateToChatsTab, navigateToChannelsTab } from "@/automations/whatsapp/helpers/whatsapp_navigation.js";
-import type { HarvestStats } from "@/automations/whatsapp/whatsapp_harvester.js";
-import type { WhatsAppSourceConfig, WhatsAppSourceType } from "@/automations/whatsapp/config/whatsapp-sources.js";
+import type { WhatsAppSourceConfig, WhatsAppSourceType } from "@/automations/whatsapp/config/whatsapp_sources.js";
 import { WHATSAPP_LOCATORS, getCombinedSelector, type LocatorDefinition } from "@/automations/whatsapp/config/whatsapp_locators.js";
 import { highlightElement } from "../../helpers/dom-highlighter.js";
 import { summarizeScopeIntegrity, PER_SOURCE_TIMEOUT_MS } from "../../helpers/scope-integrity.js";

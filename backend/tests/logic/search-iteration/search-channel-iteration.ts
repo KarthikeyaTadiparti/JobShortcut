@@ -1,11 +1,8 @@
 import { test, expect, type Page } from "@playwright/test";
-import {
-  openFollowedChannel,
-  ExtractionScope,
-  type SearchAndOpenResult,
-} from "@/automations/whatsapp/whatsapp_scraper.js";
+import { openFollowedChannel, type SearchAndOpenResult } from "@/automations/whatsapp/helpers/whatsapp_open_chat.js";
+import { ExtractionScope } from "@/automations/whatsapp/whatsapp_types.js";
 import { navigateToChannelsTab, randomJitter } from "@/automations/whatsapp/helpers/whatsapp_navigation.js";
-import type { WhatsAppChannelConfig } from "@/automations/whatsapp/config/whatsapp-sources.js";
+import type { WhatsAppChannelConfig } from "@/automations/whatsapp/config/whatsapp_sources.js";
 import { WHATSAPP_LOCATORS, getCombinedSelector } from "@/automations/whatsapp/config/whatsapp_locators.js";
 import { highlightElement } from "../../helpers/dom-highlighter.js";
 

@@ -1,11 +1,11 @@
 import { scrapeWhatsAppJobLinks } from "./whatsapp_scraper.js";
-import { ExtractionScope } from "./whatsapp-types.js";
+import { ExtractionScope } from "./whatsapp_types.js";
 
 async function main() {
     // Supported forms:
-    //   npm run scrape:whatsapp -- today          (positional)
-    //   npm run scrape:whatsapp -- --scope=today  (flag after --)
-    //   npm run scrape:whatsapp --scope=today     (npm consumes the flag and exposes it as npm_config_scope)
+    //   npm run whatsapp -- today          (positional)
+    //   npm run whatsapp -- --scope=today  (flag after --)
+    //   npm run whatsapp --scope=today     (npm consumes the flag and exposes it as npm_config_scope)
     const args = process.argv.slice(2);
     const rawArg =
         args.find((a) => !a.startsWith("-")) ||
@@ -26,6 +26,7 @@ async function main() {
     console.log(`Mode: Automated Playwright Web extraction (Groups & Broadcast Channels)`);
     console.log(`=================================================================\n`);
 
+    let qrAnnounced = false;
     try {
         const result = await scrapeWhatsAppJobLinks(
             {
@@ -38,7 +39,11 @@ async function main() {
                         console.log(`[STATUS] ${event.message}`);
                         break;
                     case "qr":
-                        console.log(`[QR CODE] Session not authenticated. Please scan QR code in the browser window.`);
+                        // The QR is re-sent each time WhatsApp rotates it; announce it once.
+                        if (!qrAnnounced) {
+                            qrAnnounced = true;
+                            console.log(`[QR CODE] Session not authenticated. Please scan QR code in the browser window.`);
+                        }
                         break;
                     case "authenticated":
                         console.log(`[AUTH] Session authenticated successfully!`);
@@ -57,6 +62,10 @@ async function main() {
                             console.log(`  [SKIPPED] ${event.result.warning || "No unread messages"}`);
                         } else if (event.result.status === "warning") {
                             console.log(`  [WARNING] ${event.result.warning}`);
+                            if (event.result.extractedLinks.length > 0) {
+                                console.log(`  Extracted ${event.result.extractedLinks.length} link(s) before the issue:`);
+                                event.result.extractedLinks.forEach((l) => console.log(`     * ${l}`));
+                            }
                         } else {
                             console.log(`  [FAILED] ${event.result.error}`);
                         }

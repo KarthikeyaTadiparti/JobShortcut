@@ -1,4 +1,4 @@
-import { ExtractionScope, type RawMessageData } from "@/automations/whatsapp/whatsapp-types.js";
+import { ExtractionScope, type RawMessageData } from "@/automations/whatsapp/whatsapp_types.js";
 import { toDateKey } from "@/automations/whatsapp/helpers/whatsapp_message_merge.js";
 
 /** Per-source budget for a live scope scan (harvester cap is 180 s plus open/search time). */

@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
-import { openFollowedChannel, ExtractionScope, type SearchAndOpenResult } from "@/automations/whatsapp/whatsapp_scraper.js";
+import { openFollowedChannel, type SearchAndOpenResult } from "@/automations/whatsapp/helpers/whatsapp_open_chat.js";
+import { ExtractionScope } from "@/automations/whatsapp/whatsapp_types.js";
 import { WHATSAPP_LOCATORS, getCombinedSelector } from "@/automations/whatsapp/config/whatsapp_locators.js";
 import { highlightElement } from "../../helpers/dom-highlighter.js";
 import type { ChannelTestContext } from "./unread.js";

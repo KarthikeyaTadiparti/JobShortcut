@@ -9,6 +9,12 @@ export interface WhatsAppSourceConfig {
     targetDomain: string;
     /** Array of allowed hostnames/domains for extracted hyperlinks; defaults to [targetDomain] */
     allowedDomains?: string[] | undefined;
+    /**
+     * Optional regex (as a string) the URL path must match to count as a job post, for sites with a
+     * stable job URL shape (e.g. '^/\d{4}/\d{2}/[^/]+\.html$'). Homepages and non-job pages are
+     * always dropped regardless of this setting.
+     */
+    jobPathPattern?: string | undefined;
     /** Whether this source is active during batch scraping runs (defaults to true) */
     enabled?: boolean | undefined;
 }
@@ -17,6 +23,7 @@ export interface WhatsAppGroupConfig {
     groupName: string;
     targetDomain: string;
     allowedDomains?: string[] | undefined;
+    jobPathPattern?: string | undefined;
     enabled?: boolean | undefined;
 }
 
@@ -24,6 +31,7 @@ export interface WhatsAppChannelConfig {
     channelName: string;
     targetDomain: string;
     allowedDomains?: string[] | undefined;
+    jobPathPattern?: string | undefined;
     enabled?: boolean | undefined;
 }
 
@@ -50,6 +58,7 @@ export const DEFAULT_WHATSAPP_GROUPS: WhatsAppGroupConfig[] = [
         groupName: 'Placement Officer (2026 Batch)',
         targetDomain: 'placement-officer.com',
         allowedDomains: ['placement-officer.com', 'www.placement-officer.com'],
+        jobPathPattern: '^/\\d{4}/\\d{2}/[^/]+\\.html$',
         enabled: true,
     },
     {
@@ -81,6 +90,7 @@ export const DEFAULT_WHATSAPP_SOURCES: WhatsAppSourceConfig[] = [
         name: g.groupName,
         targetDomain: g.targetDomain,
         allowedDomains: g.allowedDomains,
+        jobPathPattern: g.jobPathPattern,
         enabled: g.enabled,
     })),
     ...DEFAULT_WHATSAPP_CHANNELS.map((c) => ({
@@ -88,6 +98,7 @@ export const DEFAULT_WHATSAPP_SOURCES: WhatsAppSourceConfig[] = [
         name: c.channelName,
         targetDomain: c.targetDomain,
         allowedDomains: c.allowedDomains,
+        jobPathPattern: c.jobPathPattern,
         enabled: c.enabled,
     })),
 ];

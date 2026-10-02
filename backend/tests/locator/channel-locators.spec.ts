@@ -3,7 +3,7 @@ import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
 import { WHATSAPP_LOCATORS, getCombinedSelector } from "@/automations/whatsapp/config/whatsapp_locators.js";
-import { DEFAULT_WHATSAPP_CHANNELS } from "@/automations/whatsapp/config/whatsapp-sources.js";
+import { DEFAULT_WHATSAPP_CHANNELS } from "@/automations/whatsapp/config/whatsapp_sources.js";
 import { validateLocatorWithFallback } from "../helpers/locator-tester.js";
 import { printDiagnosticReport, type LocatorValidationResult } from "../helpers/reporter-formatter.js";
 import { waitForWhatsAppLoadingToComplete } from "../helpers/page-ready.js";

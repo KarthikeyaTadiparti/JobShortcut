@@ -1,6 +1,6 @@
 import { type Page } from "playwright";
-import { WHATSAPP_LOCATORS, getCombinedSelector } from "./config/whatsapp_locators.js";
-import { ExtractionScope, type RawMessageData } from "./whatsapp-types.js";
+import { WHATSAPP_LOCATORS, getCombinedSelector } from "@/automations/whatsapp/config/whatsapp_locators.js";
+import { ExtractionScope, type RawMessageData } from "@/automations/whatsapp/whatsapp_types.js";
 import {
     assignDates,
     createMergeState,
@@ -14,7 +14,7 @@ import {
     type DateOrder,
     type HarvestItem,
     type MergeState,
-} from "./helpers/whatsapp_message_merge.js";
+} from "./whatsapp_message_merge.js";
 
 /**
  * One harvested view of the currently mounted conversation rows, oldest -> newest.
@@ -26,7 +26,7 @@ export interface WindowSnapshot {
     loading: boolean;
 }
 
-export type HarvestStopReason = "boundary" | "top" | "timeout" | "no-messages";
+export type HarvestStopReason = "boundary" | "top" | "timeout" | "aborted" | "no-messages";
 
 export interface HarvestStats {
     windows: number;
@@ -34,6 +34,8 @@ export interface HarvestStats {
     unrecoveredGaps: number;
     /** Scope messages whose content never rendered (should be 0). */
     placeholdersRemaining: number;
+    /** Scope messages whose "Read more" body never expanded, so links in it may be missing (should be 0). */
+    truncatedRemaining: number;
     totalItems: number;
     totalMessages: number;
     scopedMessages: number;
@@ -54,6 +56,8 @@ export interface HarvestOptions {
     stepRatio?: number | undefined;
     /** Reference "today" for date scopes. Default: now. */
     today?: Date | undefined;
+    /** Stops the scan early (e.g. the client disconnected); the result is then partial. */
+    signal?: AbortSignal | undefined;
 }
 
 export interface HarvestResult {
@@ -135,6 +139,17 @@ export async function snapshotWindow(page: Page): Promise<WindowSnapshot> {
                 /\b\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}\b/.test(t) ||
                 /\b\d{4}-\d{1,2}-\d{1,2}\b/.test(t) ||
                 /\b(january|february|march|april|may|june|july|august|september|october|november|december)\b/i.test(t));
+        // Reads text with emoji kept: WhatsApp renders emoji as <img alt="..">, which
+        // innerText/textContent skip.
+        const readText = (n: Element) => {
+            const clone = n.cloneNode(true) as Element;
+            clone.querySelectorAll("img").forEach((img) => {
+                const alt = img.getAttribute("data-plain-text") || img.getAttribute("alt") || "";
+                img.replaceWith(document.createTextNode(alt));
+            });
+            clone.querySelectorAll("br").forEach((br) => br.replaceWith(document.createTextNode("\n")));
+            return clone.textContent || "";
+        };
         const isPinned = (el: Element) => {
             let cur: Element | null = el;
             while (cur && cur !== root) {
@@ -268,10 +283,10 @@ export async function snapshotWindow(page: Page): Promise<WindowSnapshot> {
             const textEls = Array.from(el.querySelectorAll('span.selectable-text, [data-testid="selectable-text"]'))
                 .filter((n) => !inQuote(n));
             const outerText = textEls.filter((n) => !textEls.some((o) => o !== n && o.contains(n)));
-            let text = outerText.map((n) => (n as HTMLElement).innerText || n.textContent || "").join("\n");
+            let text = outerText.map(readText).join("\n");
             if (!text) {
                 const copyable = Array.from(el.querySelectorAll(".copyable-text")).find((n) => !inQuote(n));
-                text = copyable ? (copyable as HTMLElement).innerText || copyable.textContent || "" : "";
+                text = copyable ? readText(copyable) : "";
             }
             text = text.replace(/\s*Read more\s*$/i, "").trim();
 
@@ -490,6 +505,7 @@ export async function collectScopeMessagesWithStats(
         gapRetries: 0,
         unrecoveredGaps: 0,
         placeholdersRemaining: 0,
+        truncatedRemaining: 0,
         totalItems: 0,
         totalMessages: 0,
         scopedMessages: 0,
@@ -518,6 +534,10 @@ export async function collectScopeMessagesWithStats(
             getScopedPlaceholders(state.ordered, scope, unreadCount, today).length === 0
         ) {
             stats.stopReason = "boundary";
+            break;
+        }
+        if (options.signal?.aborted) {
+            stats.stopReason = "aborted";
             break;
         }
         if (Date.now() - startedAt > maxDurationMs) {
@@ -579,7 +599,7 @@ export async function collectScopeMessagesWithStats(
     // Safety net: jump straight to any scope message whose content never rendered.
     const leftovers = getScopedPlaceholders(state.ordered, scope, unreadCount, today).slice(0, 50);
     for (const item of leftovers) {
-        if (!item.dataId || Date.now() - startedAt > maxDurationMs + 30000) break;
+        if (!item.dataId || options.signal?.aborted || Date.now() - startedAt > maxDurationMs + 30000) break;
         if (!(await scrollAnchorIntoView(page, item.dataId, "center"))) continue;
         await waitForSettle(page, 2500);
         snap = await harvestOnce(page);
@@ -591,6 +611,7 @@ export async function collectScopeMessagesWithStats(
 
     const scoped = sliceScope(state.ordered, scope, unreadCount, today);
     stats.placeholdersRemaining = scoped.filter((i) => i.placeholder).length;
+    stats.truncatedRemaining = scoped.filter((i) => i.truncated && !i.placeholder).length;
 
     stats.totalItems = state.ordered.length;
     stats.totalMessages = state.ordered.filter((i) => i.type === "message").length;

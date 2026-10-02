@@ -5,12 +5,13 @@ import { scrapeWhatsAppJobLinks } from "@/automations/whatsapp/whatsapp_scraper.
 import {
     launchWhatsAppContext,
     checkWhatsAppAuthState,
+    WhatsAppSessionBusyError,
 } from "@/automations/whatsapp/whatsapp_session.js";
 import {
     ExtractionScope,
     type WhatsAppSourceConfig,
     type WhatsAppScrapeOptions,
-} from "@/automations/whatsapp/whatsapp-types.js";
+} from "@/automations/whatsapp/whatsapp_types.js";
 
 /**
  * Controller to handle WhatsApp scraper requests with real-time SSE streaming.
@@ -30,8 +31,10 @@ export const handleWhatsAppScrape = wrapAsync(async (req: Request, res: Response
     // Set up SSE stream
     const sendEvent = initSSEStream(res);
 
+    // Cancel when the client disconnects. This must listen on `res`: `req` emits "close" as
+    // soon as express.json() has consumed the body, which would abort every scrape at once.
     const abortController = new AbortController();
-    req.on("close", () => {
+    res.on("close", () => {
         if (!res.writableEnded) {
             abortController.abort();
         }
@@ -72,22 +75,31 @@ export const handleWhatsAppScrape = wrapAsync(async (req: Request, res: Response
  */
 export const handleWhatsAppStatus = wrapAsync(async (_req: Request, res: Response) => {
     let authenticated = false;
+    let busy = false;
     try {
         const { context, page } = await launchWhatsAppContext({ headless: true });
         try {
-            const authState = await checkWhatsAppAuthState(page, 5000);
+            // WhatsApp Web usually needs 10+ seconds to show the chat list after loading.
+            const authState = await checkWhatsAppAuthState(page, 30000);
             authenticated = authState.authenticated;
         } finally {
             await context.close().catch(() => { });
         }
     } catch (error) {
-        console.warn("Could not check WhatsApp status:", error);
+        if (error instanceof WhatsAppSessionBusyError) {
+            // A scrape is running on this session; launching a second browser would kick it out.
+            busy = true;
+        } else {
+            console.warn("[WARNING] Could not check WhatsApp status:", error);
+        }
     }
 
     res.status(200).json({
         status: true,
         data: {
             authenticated,
+            busy,
         },
+        ...(busy ? { message: "WhatsApp session is busy with a running scrape" } : {}),
     });
 });

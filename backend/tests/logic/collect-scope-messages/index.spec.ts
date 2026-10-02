@@ -1,13 +1,14 @@
 import { test, type BrowserContext, type Page } from "@playwright/test";
 import { launchWhatsAppContext, checkWhatsAppAuthState } from "@/automations/whatsapp/whatsapp_session.js";
-import { DEFAULT_WHATSAPP_SOURCES } from "@/automations/whatsapp/config/whatsapp-sources.js";
-import { ExtractionScope } from "@/automations/whatsapp/whatsapp-types.js";
+import { DEFAULT_WHATSAPP_SOURCES } from "@/automations/whatsapp/config/whatsapp_sources.js";
+import { ExtractionScope } from "@/automations/whatsapp/whatsapp_types.js";
 
 import { registerCollectScopeMessagesTests } from "./collect-scope-messages.js";
 
 /**
  * Scopes to exercise, in order. Opening a chat marks it read, so 'unread' must run first.
  * Override with COLLECT_SCOPES=unread,today,yesterday (default: today).
+ * COLLECT_SCOPES=today npx playwright test tests/logic/collect-scope-messages/index.spec.ts
  */
 const SCOPE_ORDER = [ExtractionScope.UNREAD, ExtractionScope.TODAY, ExtractionScope.YESTERDAY];
 const requestedScopes = (process.env.COLLECT_SCOPES ?? ExtractionScope.TODAY)

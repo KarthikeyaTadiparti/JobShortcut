@@ -1,6 +1,6 @@
 import { test, type BrowserContext, type Page } from "@playwright/test";
 import { launchWhatsAppContext, checkWhatsAppAuthState } from "@/automations/whatsapp/whatsapp_session.js";
-import { DEFAULT_WHATSAPP_GROUPS, DEFAULT_WHATSAPP_CHANNELS } from "@/automations/whatsapp/config/whatsapp-sources.js";
+import { DEFAULT_WHATSAPP_GROUPS, DEFAULT_WHATSAPP_CHANNELS } from "@/automations/whatsapp/config/whatsapp_sources.js";
 
 import { registerExtractGroupLinkTests } from "./extract-group-link.js";
 import { registerExtractChannelLinkTests } from "./extract-channel-link.js";

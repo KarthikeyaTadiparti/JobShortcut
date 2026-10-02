@@ -9,8 +9,8 @@ import {
     sliceScope,
     type HarvestItem,
 } from "@/automations/whatsapp/helpers/whatsapp_message_merge.js";
-import { collectScopeMessagesWithStats } from "@/automations/whatsapp/whatsapp_harvester.js";
-import { ExtractionScope } from "@/automations/whatsapp/whatsapp-types.js";
+import { collectScopeMessagesWithStats } from "@/automations/whatsapp/helpers/whatsapp_harvester.js";
+import { ExtractionScope } from "@/automations/whatsapp/whatsapp_types.js";
 import { buildVirtualizedChat, type FixtureOptions } from "../../helpers/virtualized-chat-fixture.js";
 import { highlightElement } from "../../helpers/dom-highlighter.js";
 

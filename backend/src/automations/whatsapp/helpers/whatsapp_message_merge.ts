@@ -7,7 +7,7 @@
  * overlap; the overlap is what lets us place new items in the right position. A window
  * that shares no item with what we already have is reported as a gap.
  */
-import { ExtractionScope } from "@/automations/whatsapp/whatsapp-types.js";
+import { ExtractionScope } from "@/automations/whatsapp/whatsapp_types.js";
 
 export type HarvestItemType = "message" | "divider" | "unread-marker";
 export type MessageKind = "text" | "media" | "other";
@@ -215,6 +215,11 @@ function normalizeYear(y: number): number {
  * WhatsApp timestamps. A part greater than 12 decides; otherwise `fallback` is used.
  */
 export function detectDateOrder(samples: string[], fallback: DateOrder = "dmy"): DateOrder {
+    return decisiveDateOrder(samples) ?? fallback;
+}
+
+/** Date order decided by a sample whose day part is greater than 12, if any. */
+function decisiveDateOrder(samples: string[]): DateOrder | undefined {
     for (const sample of samples) {
         const m = sample.match(NUMERIC_DATE);
         if (!m) continue;
@@ -224,7 +229,53 @@ export function detectDateOrder(samples: string[], fallback: DateOrder = "dmy"):
         if (a > 12 && b <= 12) return "dmy";
         if (b > 12 && a <= 12) return "mdy";
     }
-    return fallback;
+    return undefined;
+}
+
+/**
+ * Infers the date order from messages under a relative divider ("Today", "Yesterday",
+ * weekday names), whose date is known without parsing numbers: the order that maps the
+ * message timestamp onto the divider's date is the right one.
+ */
+export function inferDateOrderFromDividers(ordered: HarvestItem[], today: Date): DateOrder | undefined {
+    let relativeDate: string | undefined;
+    for (const item of ordered) {
+        if (item.type === "divider") {
+            relativeDate = /\d/.test(item.dividerText) ? undefined : parseDividerDate(item.dividerText, today, "dmy");
+            continue;
+        }
+        if (item.type !== "message" || !relativeDate || !item.prePlainText) continue;
+        const dmy = parseNumericDate(item.prePlainText, "dmy");
+        const mdy = parseNumericDate(item.prePlainText, "mdy");
+        if (dmy === relativeDate && mdy !== relativeDate) return "dmy";
+        if (mdy === relativeDate && dmy !== relativeDate) return "mdy";
+    }
+    return undefined;
+}
+
+/** Day/month order of the machine's locale, used only when the conversation cannot decide. */
+export function systemDateOrder(): DateOrder {
+    try {
+        const parts = new Intl.DateTimeFormat().formatToParts(new Date(2001, 10, 22));
+        const order = parts.filter((p) => p.type === "day" || p.type === "month" || p.type === "year").map((p) => p.type);
+        if (order[0] === "year") return "ymd";
+        if (order[0] === "month") return "mdy";
+    } catch {
+        // Fall through to day-first.
+    }
+    return "dmy";
+}
+
+/**
+ * Resolves the conversation's date order: a decisive timestamp (day > 12) first, then the
+ * relative dividers, then the machine locale.
+ */
+export function resolveDateOrder(ordered: HarvestItem[], today: Date): DateOrder {
+    return (
+        decisiveDateOrder(ordered.filter((i) => i.prePlainText).map((i) => i.prePlainText)) ??
+        inferDateOrderFromDividers(ordered, today) ??
+        systemDateOrder()
+    );
 }
 
 /** Parses a numeric date (e.g. "1/10/2026", "2026-10-01") using the given order. */
@@ -295,8 +346,7 @@ export function parseDividerDate(label: string, today: Date, order: DateOrder): 
  * divider was already unmounted still get the right date.
  */
 export function assignDates(ordered: HarvestItem[], today: Date, order?: DateOrder): DateOrder {
-    const resolvedOrder =
-        order ?? detectDateOrder(ordered.filter((i) => i.prePlainText).map((i) => i.prePlainText));
+    const resolvedOrder = order ?? resolveDateOrder(ordered, today);
 
     let currentDate: string | undefined;
     let currentLabel = "";
