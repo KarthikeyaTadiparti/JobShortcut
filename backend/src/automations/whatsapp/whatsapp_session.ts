@@ -216,9 +216,9 @@ const LOADING_SELECTOR = getCombinedSelector(WHATSAPP_LOCATORS.loadingProgressBa
 
 /**
  * Longest total wait while WhatsApp keeps showing its loading screen. Syncing a large account
- * can take well over 20 seconds, and giving up then is a false "not logged in".
+ * can take several minutes, and giving up early causes a false "not logged in" timeout.
  */
-const MAX_LOADING_WAIT_MS = 120000;
+const MAX_LOADING_WAIT_MS = 300000; // 5 minutes
 
 /**
  * True when at least one element matching the selector is rendered and visible.

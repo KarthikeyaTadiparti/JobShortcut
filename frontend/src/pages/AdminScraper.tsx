@@ -318,7 +318,7 @@ Apply Link:${selectedLink.trim()}`;
                     setScrapedCount((prev) => prev + 1);
                     setResults((prev) => ({
                         ...prev,
-                        [url]: result
+                        [url]: prev[url] !== undefined ? prev[url] : result
                     }));
                     setLogs((prev) =>
                         prev.map((l) =>
@@ -329,7 +329,10 @@ Apply Link:${selectedLink.trim()}`;
                     );
                 },
                 onDone: (results) => {
-                    setResults(results);
+                    setResults((prev) => ({
+                        ...results,
+                        ...prev,
+                    }));
                     setCurrentlyScraping('');
                 }
             });
@@ -347,11 +350,15 @@ Apply Link:${selectedLink.trim()}`;
     const handleStartScrape = () => {
         if (!urlInput.trim()) return
 
-        // Parse URLs locally to calculate total count
-        const urlsArray = urlInput
-            .split(',')
-            .map((url) => url.trim())
-            .filter(Boolean)
+        // Parse and deduplicate URLs locally to calculate total count
+        const urlsArray = Array.from(
+            new Set(
+                urlInput
+                    .split(',')
+                    .map((url) => url.trim())
+                    .filter(Boolean)
+            )
+        )
 
         if (urlsArray.length === 0) {
             setError('Please enter at least one valid URL.')
@@ -359,7 +366,7 @@ Apply Link:${selectedLink.trim()}`;
         }
 
         setTotalCount(urlsArray.length)
-        scrapeMutation.mutate(urlInput)
+        scrapeMutation.mutate(urlsArray.join(', '))
     }
 
 
