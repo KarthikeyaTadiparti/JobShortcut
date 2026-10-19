@@ -1,9 +1,54 @@
 import db from "@/config/db.js";
 import { jobs } from "@/schema/jobs-schema.js";
 import type { Job, NewJob } from "@/schema/jobs-schema.js";
-import { eq, ilike, or, and, not, desc, isNull, count } from "drizzle-orm";
+import { eq, ilike, or, and, not, desc, isNull, count, inArray } from "drizzle-orm";
 import { normalizeJobUrl } from "@/utils/normalize-url.js";
 
+
+/**
+ * Checks which apply links in the provided array already exist in the jobs table.
+ * Normalizes all links and runs a single batched query with IN (...) instead of N individual roundtrips.
+ * Returns an array of existing apply links (original unnormalized strings that matched).
+ */
+export async function checkApplyLinksExist(applyLinks: string[]): Promise<string[]> {
+    if (!applyLinks || applyLinks.length === 0) {
+        return [];
+    }
+
+    try {
+        const normalizedToOriginals = new Map<string, string[]>();
+        for (const link of applyLinks) {
+            if (!link || typeof link !== "string") continue;
+            const normalized = normalizeJobUrl(link);
+            const list = normalizedToOriginals.get(normalized) || [];
+            list.push(link);
+            normalizedToOriginals.set(normalized, list);
+        }
+
+        const normalizedKeys = Array.from(normalizedToOriginals.keys());
+        if (normalizedKeys.length === 0) {
+            return [];
+        }
+
+        const existing = await db
+            .select({ applyLink: jobs.applyLink })
+            .from(jobs)
+            .where(inArray(jobs.applyLink, normalizedKeys));
+
+        const duplicateLinks: string[] = [];
+        for (const row of existing) {
+            const originals = normalizedToOriginals.get(row.applyLink);
+            if (originals) {
+                duplicateLinks.push(...originals);
+            }
+        }
+
+        return duplicateLinks;
+    } catch (error) {
+        console.error("Error batch-checking apply links existence in db:", error);
+        return [];
+    }
+}
 
 /**
  * Checks if the provided apply link already exists in the jobs table.
@@ -14,18 +59,8 @@ export async function checkApplyLinkExists(applyLink: string): Promise<boolean> 
         return false;
     }
 
-    try {
-        const normalized = normalizeJobUrl(applyLink);
-        const existing = await db
-            .select({ id: jobs.id })
-            .from(jobs)
-            .where(eq(jobs.applyLink, normalized));
-
-        return existing.length > 0;
-    } catch (error) {
-        console.error("Error checking apply link existence in db:", error);
-        return false;
-    }
+    const duplicates = await checkApplyLinksExist([applyLink]);
+    return duplicates.length > 0;
 }
 
 /**
