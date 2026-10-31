@@ -1,6 +1,6 @@
-import db from "../config/db.js";
-import { admins } from "../schema/admins-schema.js";
-import type { Admin, NewAdmin } from "../schema/admins-schema.js";
+import db from "@/config/db.js";
+import { admins } from "@/schema/admins-schema.js";
+import type { Admin, NewAdmin } from "@/schema/admins-schema.js";
 import { eq } from "drizzle-orm";
 
 export async function createAdmin(data: NewAdmin): Promise<Admin> {

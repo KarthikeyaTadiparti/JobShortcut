@@ -1,0 +1,195 @@
+openapi: 3.0.3
+info:
+  title: JobShortcut WhatsApp Scraper API
+  version: 1.0.0
+  description: Endpoints for triggering WhatsApp Web automated link extraction and streaming real-time status.
+paths:
+  /api/scraper/whatsapp:
+    post:
+      summary: Start WhatsApp Web automated job link extraction with SSE streaming
+      description: Launches the Playwright WhatsApp Web scraper to search configured groups, extract job links based on the requested scope, and stream progress events.
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WhatsAppScrapeRequest'
+      responses:
+        '200':
+          description: Server-Sent Events stream containing real-time status, QR codes (if unauthenticated), and the final extracted URLs list.
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                description: SSE stream emitting WhatsAppSSEEvent JSON payloads.
+        '400':
+          description: Invalid request parameters or unsupported scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized admin session.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/scraper/whatsapp/status:
+    get:
+      summary: Check current WhatsApp session status
+      description: Returns whether an active persistent WhatsApp Web session is currently authenticated or requires QR scanning.
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Session status details.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      authenticated:
+                        type: boolean
+                        example: true
+                      lastActive:
+                        type: string
+                        format: date-time
+                        nullable: true
+        '401':
+          description: Unauthorized admin session.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: token
+  schemas:
+    WhatsAppScrapeRequest:
+      type: object
+      required:
+        - scope
+      properties:
+        scope:
+          type: string
+          enum: [unread, today, yesterday]
+          default: unread
+          description: Message timeframe filter scope.
+        groups:
+          type: array
+          description: Optional custom list of groups to scrape instead of default configuration.
+          items:
+            $ref: '#/components/schemas/WhatsAppGroupConfig'
+        headless:
+          type: boolean
+          default: true
+          description: Whether to run Playwright in headless mode.
+
+    WhatsAppGroupConfig:
+      type: object
+      required:
+        - groupName
+        - targetDomain
+      properties:
+        groupName:
+          type: string
+          example: 'Jobcode 37'
+        targetDomain:
+          type: string
+          example: 'jobcode.in'
+        allowedDomains:
+          type: array
+          items:
+            type: string
+          example: ['jobcode.in']
+        enabled:
+          type: boolean
+          default: true
+
+    GroupScrapeResult:
+      type: object
+      properties:
+        groupName:
+          type: string
+        targetDomain:
+          type: string
+        status:
+          type: string
+          enum: [success, skipped, failed, warning]
+        unreadCount:
+          type: integer
+          nullable: true
+        messagesRendered:
+          type: integer
+          nullable: true
+        messagesProcessed:
+          type: integer
+          nullable: true
+        extractedLinks:
+          type: array
+          items:
+            type: string
+        warning:
+          type: string
+          nullable: true
+        error:
+          type: string
+          nullable: true
+
+    WhatsAppImportResult:
+      type: object
+      properties:
+        success:
+          type: boolean
+        scope:
+          type: string
+          enum: [unread, today, yesterday]
+        totalGroups:
+          type: integer
+        processedGroups:
+          type: integer
+        skippedGroups:
+          type: integer
+        failedGroups:
+          type: integer
+        groupResults:
+          type: array
+          items:
+            $ref: '#/components/schemas/GroupScrapeResult'
+        urls:
+          type: array
+          items:
+            type: string
+        totalUrls:
+          type: integer
+        startedAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+        durationMs:
+          type: integer
+
+    ErrorResponse:
+      type: object
+      properties:
+        status:
+          type: boolean
+          example: false
+        message:
+          type: string
+          example: 'Invalid scope parameter'

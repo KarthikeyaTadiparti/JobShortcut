@@ -1,9 +1,9 @@
 import type { Request, Response } from "express";
 import bcrypt from "bcrypt";
-import ExpressError from "../middlewares/errorhandler.js";
-import genJwt from "../utils/gen-jwt.js";
-import wrapAsync from "../utils/wrap-async.js";
-import { createAdmin, getAdmins, getAdminByEmail } from "../services/admin-services.js";
+import ExpressError from "@/middlewares/errorhandler.js";
+import genJwt from "@/utils/gen-jwt.js";
+import wrapAsync from "@/utils/wrap-async.js";
+import { createAdmin, getAdmins, getAdminByEmail } from "@/services/admin-services.js";
 
 // Signup
 export const handleAdminSignup = wrapAsync(async (req: Request, res: Response) => {

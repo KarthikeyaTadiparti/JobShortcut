@@ -7,7 +7,6 @@ import UserJobs from './pages/UserJobs'
 import UserHome from './pages/UserHome'
 
 function Admin() {
-
   const { isAuthenticated } = useSelector((state: RootState) => state.auth)
 
   if (!isAuthenticated) {
@@ -15,7 +14,6 @@ function Admin() {
   }
 
   return <Navigate to="/admin/scraper" replace />
-
 }
 
 function App() {
@@ -28,6 +26,7 @@ function App() {
         
         <Route path="/" element={<UserHome />} />
         <Route path="/jobs" element={<UserJobs />} />
+        <Route path="/jobs/:id" element={<UserJobs />} />
 
         {/* Catch-all route */}
         <Route path="*" element={<Navigate to="/" replace />} />

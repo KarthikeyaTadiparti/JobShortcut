@@ -19,15 +19,19 @@ import {
     Check,
     X,
     Copy,
+    Radio,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Textarea } from "@/components/ui/textarea"
 import AdminNavbar from '@/components/AdminNavbar'
 import WarningDialog from '@/components/WarningDialog'
 import CreateJobDialog from '@/components/CreateJobDialog'
+import WhatsAppImportModal from '@/components/WhatsAppImportModal'
 import InlineEdit from '@/components/InlineEdit'
+import { encodeJobId } from '@/lib/utils'
 
 interface ScrapedJob {
+    id?: number;
     company: string | null;
     jobRole: string | null;
     experience: string | null;
@@ -132,6 +136,7 @@ function Scraper() {
     // Approve / Reject States
     const [approvedUrls, setApprovedUrls] = useState<string[]>([])
     const [rejectedUrls, setRejectedUrls] = useState<string[]>([])
+    const [approvedJobIds, setApprovedJobIds] = useState<Record<string, number>>({})
 
     // Track selected apply link for each scraped card (keyed by card url)
     const [selectedLinks, setSelectedLinks] = useState<Record<string, string>>({})
@@ -143,6 +148,19 @@ function Scraper() {
     const [showDialog, setShowDialog] = useState(false)
     const [dialogMessage, setDialogMessage] = useState('')
     const [showCreateDialog, setShowCreateDialog] = useState(false)
+    const [showWhatsAppModal, setShowWhatsAppModal] = useState(false)
+
+    const handleWhatsAppImportComplete = (importedUrls: string[]) => {
+        if (!importedUrls || importedUrls.length === 0) return
+        setUrlInput((prev) => {
+            const currentList = prev
+                .split(',')
+                .map((u) => u.trim())
+                .filter(Boolean)
+            const combined = Array.from(new Set([...currentList, ...importedUrls]))
+            return combined.join(', ')
+        })
+    }
 
     const approveMutation = useMutation({
         mutationFn: async ({ jobData, selectedLink }: { url: string; jobData: ScrapedJob; selectedLink: string }) => {
@@ -154,7 +172,13 @@ function Scraper() {
                 applyLink: selectedLink,
             });
         },
-        onSuccess: (_data, variables) => {
+        onSuccess: (res: any, variables) => {
+            if (res?.data?.id) {
+                setApprovedJobIds((prev) => ({
+                    ...prev,
+                    [variables.url]: res.data.id
+                }));
+            }
             setApprovedUrls((prev) => [...prev, variables.url]);
             setRejectedUrls((prev) => prev.filter((u) => u !== variables.url));
             toast.success("Job added successfully!");
@@ -211,12 +235,16 @@ function Scraper() {
 
     const handleCopyWhatsApp = (url: string, jobData: ScrapedJob) => {
         const selectedLink = selectedLinks[url] || (jobData.applyLinks && jobData.applyLinks[0]) || "";
-        const message = `Job role: ${(jobData.jobRole || '').trim()}
-Company: ${(jobData.company || '').trim()}
-Location: ${(jobData.location || '').trim()}
-Experience: ${(jobData.experience || '').trim()}
+        const jobId = approvedJobIds[url] || jobData.id;
+        const publicBaseUrl = (import.meta.env.VITE_PUBLIC_BASE_URL || window.location.origin).replace(/\/+$/, "");
+        const applyLinkToUse = jobId ? `${publicBaseUrl}/jobs/${encodeJobId(jobId)}` : selectedLink.trim();
 
-Apply Link:${selectedLink.trim()}`;
+        const message = `Job role: ${(jobData.jobRole || "").trim()}
+Company: ${(jobData.company || "").trim()}
+Location: ${(jobData.location || "").trim()}
+Experience: ${(jobData.experience || "").trim()}
+
+Apply Link: ${applyLinkToUse}`;
 
         navigator.clipboard.writeText(message)
             .then(() => {
@@ -231,17 +259,20 @@ Apply Link:${selectedLink.trim()}`;
     };
 
     const handleCopyAllApprovedWhatsApp = () => {
+        const publicBaseUrl = (import.meta.env.VITE_PUBLIC_BASE_URL || window.location.origin).replace(/\/+$/, '');
         const approvedJobs = Object.entries(results)
             .filter(([url, jobData]) => jobData !== null && approvedUrls.includes(url))
             .map(([url, jobData]) => {
                 const data = jobData!;
                 const selectedLink = selectedLinks[url] || (data.applyLinks && data.applyLinks[0]) || "";
+                const jobId = approvedJobIds[url] || data.id;
+                const applyLinkToUse = jobId ? `${publicBaseUrl}/jobs/${encodeJobId(jobId)}` : selectedLink.trim();
                 return {
                     jobRole: (data.jobRole || '').trim(),
                     company: (data.company || '').trim(),
                     location: (data.location || '').trim(),
                     experience: (data.experience || '').trim(),
-                    applyLink: selectedLink.trim()
+                    applyLink: applyLinkToUse
                 };
             });
 
@@ -283,6 +314,7 @@ Apply Link:${selectedLink.trim()}`;
             setLogs([])
             setApprovedUrls([])
             setRejectedUrls([])
+            setApprovedJobIds({})
 
             await startScraperStream(urls, {
                 onStatus: (url, message) => {
@@ -303,7 +335,7 @@ Apply Link:${selectedLink.trim()}`;
                     setScrapedCount((prev) => prev + 1);
                     setResults((prev) => ({
                         ...prev,
-                        [url]: result
+                        [url]: prev[url] !== undefined ? prev[url] : result
                     }));
                     setLogs((prev) =>
                         prev.map((l) =>
@@ -314,7 +346,10 @@ Apply Link:${selectedLink.trim()}`;
                     );
                 },
                 onDone: (results) => {
-                    setResults(results);
+                    setResults((prev) => ({
+                        ...results,
+                        ...prev,
+                    }));
                     setCurrentlyScraping('');
                 }
             });
@@ -332,11 +367,15 @@ Apply Link:${selectedLink.trim()}`;
     const handleStartScrape = () => {
         if (!urlInput.trim()) return
 
-        // Parse URLs locally to calculate total count
-        const urlsArray = urlInput
-            .split(',')
-            .map((url) => url.trim())
-            .filter(Boolean)
+        // Parse and deduplicate URLs locally to calculate total count
+        const urlsArray = Array.from(
+            new Set(
+                urlInput
+                    .split(',')
+                    .map((url) => url.trim())
+                    .filter(Boolean)
+            )
+        )
 
         if (urlsArray.length === 0) {
             setError('Please enter at least one valid URL.')
@@ -344,7 +383,7 @@ Apply Link:${selectedLink.trim()}`;
         }
 
         setTotalCount(urlsArray.length)
-        scrapeMutation.mutate(urlInput)
+        scrapeMutation.mutate(urlsArray.join(', '))
     }
 
 
@@ -364,13 +403,22 @@ Apply Link:${selectedLink.trim()}`;
                             Extract jobs automatically or add them manually to your tracker database.
                         </p>
                     </div>
-                    <Button
-                        onClick={() => setShowCreateDialog(true)}
-                        className="cursor-pointer bg-indigo-600 hover:bg-indigo-500 text-white font-medium gap-2 px-4 py-5 rounded-lg transition-all self-start sm:self-center"
-                    >
-                        <Plus className="h-4 w-4" />
-                        Create Job
-                    </Button>
+                    <div className="flex items-center gap-3 self-start sm:self-center">
+                        <Button
+                            onClick={() => setShowWhatsAppModal(true)}
+                            className="cursor-pointer bg-emerald-600 hover:bg-emerald-500 text-white font-medium gap-2 px-4 py-5 rounded-lg transition-all"
+                        >
+                            <Radio className="h-4 w-4" />
+                            Import from WhatsApp
+                        </Button>
+                        <Button
+                            onClick={() => setShowCreateDialog(true)}
+                            className="cursor-pointer bg-indigo-600 hover:bg-indigo-500 text-white font-medium gap-2 px-4 py-5 rounded-lg transition-all"
+                        >
+                            <Plus className="h-4 w-4" />
+                            Create Job
+                        </Button>
+                    </div>
                 </div>
 
                 <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
@@ -860,6 +908,13 @@ Apply Link:${selectedLink.trim()}`;
 
             {/* Create Job Manual Dialog Modal */}
             <CreateJobDialog isOpen={showCreateDialog} onClose={() => setShowCreateDialog(false)} />
+
+            {/* WhatsApp Import Modal */}
+            <WhatsAppImportModal
+                isOpen={showWhatsAppModal}
+                onClose={() => setShowWhatsAppModal(false)}
+                onImportComplete={handleWhatsAppImportComplete}
+            />
         </div>
     )
 }

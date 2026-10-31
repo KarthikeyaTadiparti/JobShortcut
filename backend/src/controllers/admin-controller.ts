@@ -1,8 +1,8 @@
 import type { Request, Response } from "express";
 import bcrypt from "bcrypt";
-import ExpressError from "../middlewares/errorhandler.js";
-import wrapAsync from "../utils/wrap-async.js";
-import { getAdmins, getAdminById, updateAdmin, deleteAdmin } from "../services/admin-services.js";
+import ExpressError from "@/middlewares/errorhandler.js";
+import wrapAsync from "@/utils/wrap-async.js";
+import { getAdmins, getAdminById, updateAdmin, deleteAdmin } from "@/services/admin-services.js";
 
 // Get all admins
 export const getAdminsHandler = wrapAsync(async (req: Request, res: Response) => {

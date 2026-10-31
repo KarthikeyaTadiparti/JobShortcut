@@ -1,9 +1,14 @@
 import type { Request, Response } from "express";
-import wrapAsync from "../utils/wrap-async.js";
-import { scrapeUrls } from "../scraper/index.js";
+import wrapAsync from "@/utils/wrap-async.js";
+import { scrapeUrls } from "@/automations/scraper/index.js";
+import db from "@/config/db.js";
+import { sql } from "drizzle-orm";
 
 export const handleScrapeRequest = wrapAsync(async (req: Request, res: Response) => {
     const urlsArray = req.urlsArray || [];
+
+    // Trigger non-blocking DB connection warm-up so Neon wakes up while Playwright launches
+    db.execute(sql`SELECT 1`).catch(() => {});
 
     // Set headers for Server-Sent Events (SSE) streaming
     res.setHeader("Content-Type", "text/event-stream");
