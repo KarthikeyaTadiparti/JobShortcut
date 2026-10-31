@@ -1,2 +1,23 @@
-docs
+# Documentation
+docs/
+
+# WhatsApp Session (sensitive credentials and browser cache)
 .whatsapp_session/
+**/.whatsapp_session/
+
+# Test Reports and Artifacts
+playwright-report/
+**/playwright-report/
+test-results/
+**/test-results/
+artifacts/
+**/artifacts/
+
+# Dependencies & Build
+node_modules/
+**/node_modules/
+dist/
+**/dist/
+.env
+.env.*
+!.env.example
