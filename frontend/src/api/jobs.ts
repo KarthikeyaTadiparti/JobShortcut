@@ -20,7 +20,7 @@ export interface Job {
 }
 
 export async function createJob(data: CreateJobData) {
-  return apiClient('/jobs', {
+  return apiClient<{ status: boolean; data: Job; message: string }>('/jobs', {
     method: 'POST',
     body: data,
   });
@@ -33,6 +33,10 @@ export async function updateJob(id: number, data: Partial<CreateJobData>) {
   });
 }
 
+export async function getJobById(id: number) {
+  return apiClient<{ status: boolean; data: Job }>(`/jobs/${id}`);
+}
+
 export async function getJobs(params?: { page: number; search?: string; location?: string; filterType?: string }) {
   const query = new URLSearchParams();
   
@@ -42,7 +46,5 @@ export async function getJobs(params?: { page: number; search?: string; location
   if (params?.filterType) query.append('filterType', params.filterType);
 
   const queryString = query.toString();
-  console.log(`/jobs${queryString ? `?${queryString}` : ''}`);
   return apiClient<{ status: boolean; data: { jobs: Job[]; currentPage: number; jobsPerPage: number; totalPages: number; totalCount: number } }>(`/jobs${queryString ? `?${queryString}` : ''}`);
 }
-

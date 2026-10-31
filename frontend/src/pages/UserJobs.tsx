@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useSelector } from 'react-redux'
 import { type RootState } from '@/redux/reducers'
@@ -16,10 +17,12 @@ import {
     AlertCircle,
     Edit3
 } from 'lucide-react'
-import { getJobs, updateJob } from '@/api'
+import { getJobs, updateJob, getJobById } from '@/api'
+import { encodeJobId, decodeJobId } from '@/lib/utils'
 import UserNavbar from '@/components/UserNavbar'
 import UserFooter from '@/components/UserFooter'
 import InlineEdit from '@/components/InlineEdit'
+import JobDetailDialog from '@/components/JobDetailDialog'
 
 export interface Job {
     id: number;
@@ -86,6 +89,8 @@ function getPaginationRange(currentPage: number, totalPages: number): (number | 
 function UserJobs() {
     const { isAuthenticated } = useSelector((state: RootState) => state.auth)
     const queryClient = useQueryClient()
+    const navigate = useNavigate()
+    const { id: routeJobId } = useParams<{ id?: string }>()
 
     const updateJobMutation = useMutation({
         mutationFn: async ({ id, data }: { id: number; data: Partial<Job> }) => {
@@ -153,13 +158,35 @@ function UserJobs() {
     const totalPages = dbJobs?.totalPages || 1;
     const totalCount = dbJobs?.totalCount || 0;
 
-
     useEffect(() => {
         setCurrentPage(1)
     }, [searchQuery, locationQuery, filterType])
 
-    
-    const paginatedJobs = displayJobs
+    const paginatedJobs = displayJobs;
+
+    // Decode URL job ID
+    const decodedJobId = routeJobId ? decodeJobId(routeJobId) : null;
+    const isDialogOpen = !!routeJobId;
+
+    // Check if the target job is already loaded locally in displayJobs
+    const localJob = decodedJobId ? displayJobs.find((j) => j.id === decodedJobId) : null;
+
+    // Query single job if direct link / not present on currently viewed page
+    const { data: singleJobResponse, isLoading: isSingleJobLoading } = useQuery({
+        queryKey: ['job', decodedJobId],
+        queryFn: async () => {
+            if (!decodedJobId) return null;
+            const res = await getJobById(decodedJobId);
+            return res.data;
+        },
+        enabled: !!decodedJobId && !localJob,
+    });
+
+    const activeJob = localJob || singleJobResponse || null;
+
+    const handleCloseDialog = () => {
+        navigate('/jobs');
+    };
 
     return (
         <div className="text-[#111827] min-h-screen flex flex-col font-sans bg-[#FCFAFF]">
@@ -289,17 +316,17 @@ function UserJobs() {
                                             <div>
                                                 {/* Location / Experience Skeleton */}
                                                 <div className="space-y-3 mb-8 border-t border-gray-100 pt-4">
-                                                    <div className="flex items-center gap-3">
+                                                    <div className="flex items-center gap-3 min-w-0">
                                                         <div className="h-4 w-4 bg-gray-200 rounded-full shrink-0" />
                                                         <div className="h-3.5 w-2/3 bg-gray-200 rounded-full" />
                                                     </div>
-                                                    <div className="flex items-center gap-3">
+                                                    <div className="flex items-center gap-3 min-w-0">
                                                         <div className="h-4 w-4 bg-gray-200 rounded-full shrink-0" />
                                                         <div className="h-3.5 w-1/2 bg-gray-200 rounded-full" />
                                                     </div>
                                                 </div>
                                                 
-                                                {/* Apply Button Skeleton */}
+                                                {/* Button Skeleton */}
                                                 <div className="h-11 w-full bg-gray-200 rounded-xl" />
                                             </div>
                                         </div>
@@ -389,7 +416,7 @@ function UserJobs() {
                                         <div>
                                             {/* Location & Experience */}
                                             <div className="space-y-2.5 mb-6 border-t border-gray-100 pt-4 font-medium text-[13px] text-[#5B6475]">
-                                                <div className="flex items-center gap-3">
+                                                <div className="flex items-center gap-3 min-w-0">
                                                     <MapPin className="h-4.5 w-4.5 text-[#5B6475]/60 shrink-0" />
                                                     {isAuthenticated ? (
                                                         <InlineEdit
@@ -400,10 +427,10 @@ function UserJobs() {
                                                             inputClassName="text-xs"
                                                         />
                                                     ) : (
-                                                        <span>{job.location || 'Not Specified'}</span>
+                                                        <span className="truncate block" title={job.location || 'Not Specified'}>{job.location || 'Not Specified'}</span>
                                                     )}
                                                 </div>
-                                                <div className="flex items-center gap-3">
+                                                <div className="flex items-center gap-3 min-w-0">
                                                     <Award className="h-4.5 w-4.5 text-[#5B6475]/60 shrink-0" />
                                                     {isAuthenticated ? (
                                                         <InlineEdit
@@ -414,7 +441,7 @@ function UserJobs() {
                                                             inputClassName="text-xs"
                                                         />
                                                     ) : (
-                                                        <span>{job.experience || 'Experience Not Stated'}</span>
+                                                        <span className="truncate block" title={job.experience || 'Experience Not Stated'}>{job.experience || 'Experience Not Stated'}</span>
                                                     )}
                                                 </div>
                                             </div>
@@ -432,15 +459,13 @@ function UserJobs() {
                                                 </div>
                                             )}
 
-                                            {/* Apply Now button */}
-                                            <a
-                                                href={job.applyLink}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="block w-full text-center bg-[#5B3DF5] text-white hover:bg-[#4a2ee0] py-3 rounded-xl font-bold text-xs shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer active:scale-95"
+                                            {/* View button opens the /jobs/:id dialog */}
+                                            <Link
+                                                to={`/jobs/${encodeJobId(job.id)}`}
+                                                className="block w-full text-center bg-[#5B3DF5] text-white hover:bg-[#4a2ee0] py-3 rounded-xl font-bold text-xs transition-colors cursor-pointer"
                                             >
-                                                Apply Now
-                                            </a>
+                                                View
+                                            </Link>
                                         </div>
                                     </motion.div>
                                 ))}
@@ -511,6 +536,14 @@ function UserJobs() {
                     </div>
                 </section>
             </main>
+
+            {/* Job Details Modal Dialog */}
+            <JobDetailDialog
+                job={activeJob}
+                isOpen={isDialogOpen}
+                isLoading={isSingleJobLoading && !localJob}
+                onClose={handleCloseDialog}
+            />
 
             <UserFooter />
         </div>

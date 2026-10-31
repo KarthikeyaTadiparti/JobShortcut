@@ -28,8 +28,10 @@ import WarningDialog from '@/components/WarningDialog'
 import CreateJobDialog from '@/components/CreateJobDialog'
 import WhatsAppImportModal from '@/components/WhatsAppImportModal'
 import InlineEdit from '@/components/InlineEdit'
+import { encodeJobId } from '@/lib/utils'
 
 interface ScrapedJob {
+    id?: number;
     company: string | null;
     jobRole: string | null;
     experience: string | null;
@@ -134,6 +136,7 @@ function Scraper() {
     // Approve / Reject States
     const [approvedUrls, setApprovedUrls] = useState<string[]>([])
     const [rejectedUrls, setRejectedUrls] = useState<string[]>([])
+    const [approvedJobIds, setApprovedJobIds] = useState<Record<string, number>>({})
 
     // Track selected apply link for each scraped card (keyed by card url)
     const [selectedLinks, setSelectedLinks] = useState<Record<string, string>>({})
@@ -169,7 +172,13 @@ function Scraper() {
                 applyLink: selectedLink,
             });
         },
-        onSuccess: (_data, variables) => {
+        onSuccess: (res: any, variables) => {
+            if (res?.data?.id) {
+                setApprovedJobIds((prev) => ({
+                    ...prev,
+                    [variables.url]: res.data.id
+                }));
+            }
             setApprovedUrls((prev) => [...prev, variables.url]);
             setRejectedUrls((prev) => prev.filter((u) => u !== variables.url));
             toast.success("Job added successfully!");
@@ -226,12 +235,16 @@ function Scraper() {
 
     const handleCopyWhatsApp = (url: string, jobData: ScrapedJob) => {
         const selectedLink = selectedLinks[url] || (jobData.applyLinks && jobData.applyLinks[0]) || "";
-        const message = `Job role: ${(jobData.jobRole || '').trim()}
-Company: ${(jobData.company || '').trim()}
-Location: ${(jobData.location || '').trim()}
-Experience: ${(jobData.experience || '').trim()}
+        const jobId = approvedJobIds[url] || jobData.id;
+        const publicBaseUrl = (import.meta.env.VITE_PUBLIC_BASE_URL || window.location.origin).replace(/\/+$/, "");
+        const applyLinkToUse = jobId ? `${publicBaseUrl}/jobs/${encodeJobId(jobId)}` : selectedLink.trim();
 
-Apply Link:${selectedLink.trim()}`;
+        const message = `Job role: ${(jobData.jobRole || "").trim()}
+Company: ${(jobData.company || "").trim()}
+Location: ${(jobData.location || "").trim()}
+Experience: ${(jobData.experience || "").trim()}
+
+Apply Link: ${applyLinkToUse}`;
 
         navigator.clipboard.writeText(message)
             .then(() => {
@@ -246,17 +259,20 @@ Apply Link:${selectedLink.trim()}`;
     };
 
     const handleCopyAllApprovedWhatsApp = () => {
+        const publicBaseUrl = (import.meta.env.VITE_PUBLIC_BASE_URL || window.location.origin).replace(/\/+$/, '');
         const approvedJobs = Object.entries(results)
             .filter(([url, jobData]) => jobData !== null && approvedUrls.includes(url))
             .map(([url, jobData]) => {
                 const data = jobData!;
                 const selectedLink = selectedLinks[url] || (data.applyLinks && data.applyLinks[0]) || "";
+                const jobId = approvedJobIds[url] || data.id;
+                const applyLinkToUse = jobId ? `${publicBaseUrl}/jobs/${encodeJobId(jobId)}` : selectedLink.trim();
                 return {
                     jobRole: (data.jobRole || '').trim(),
                     company: (data.company || '').trim(),
                     location: (data.location || '').trim(),
                     experience: (data.experience || '').trim(),
-                    applyLink: selectedLink.trim()
+                    applyLink: applyLinkToUse
                 };
             });
 
@@ -298,6 +314,7 @@ Apply Link:${selectedLink.trim()}`;
             setLogs([])
             setApprovedUrls([])
             setRejectedUrls([])
+            setApprovedJobIds({})
 
             await startScraperStream(urls, {
                 onStatus: (url, message) => {

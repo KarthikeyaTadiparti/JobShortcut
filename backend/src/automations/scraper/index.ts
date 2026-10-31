@@ -8,9 +8,10 @@ import { extractJobLinks as scrapeFreshersHunt } from "./freshers_hunt_scraper.j
 import { extractJobLinks as scrapeDailyPharma } from "./dailypharmajobs_scraper.js";
 import { extractJobLinks as scrapeFoundTheJob } from "./found_the_job_scraper.js";
 import { extractJobLinks as scrapeFreshersDunia } from "./freshers_dunia_scraper.js";
-import { checkApplyLinksExist } from "@/services/job-services.js";
+import { checkApplyLinksExistWithIds } from "@/services/job-services.js";
 
 export interface ScrapedJob {
+  id?: number;
   company: string | null;
   jobRole: string | null;
   experience: string | null;
@@ -52,14 +53,21 @@ export async function scrapeUrl(url: string): Promise<ScrapedJob | null> {
 
     if (result) {
       let duplicateLinks: string[] = [];
+      let linkToId: Record<string, number> = {};
       if (Array.isArray(result.applyLinks) && result.applyLinks.length > 0) {
-        duplicateLinks = await checkApplyLinksExist(result.applyLinks);
+        const checkResult = await checkApplyLinksExistWithIds(result.applyLinks);
+        duplicateLinks = checkResult.duplicateLinks;
+        linkToId = checkResult.linkToId;
       }
 
       const isDuplicate = duplicateLinks.length > 0;
       result.duplicateLinks = duplicateLinks;
       result.alreadyExists = isDuplicate;
       result.status = isDuplicate ? "duplicate" : "scraped";
+      const firstDuplicate = duplicateLinks[0];
+      if (isDuplicate && firstDuplicate && linkToId[firstDuplicate]) {
+        result.id = linkToId[firstDuplicate];
+      }
     }
 
     return result;

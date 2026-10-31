@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
 import wrapAsync from "@/utils/wrap-async.js";
-import { createJob, updateJob, checkApplyLinkExists, getJobsList } from "@/services/job-services.js";
+import { createJob, updateJob, checkApplyLinkExists, getJobsList, getJobById } from "@/services/job-services.js";
 import ExpressError from "@/middlewares/errorhandler.js";
 import { normalizeJobUrl } from "@/utils/normalize-url.js";
 
@@ -16,7 +16,6 @@ export const createJobHandler = wrapAsync(async (req: Request, res: Response) =>
     if (!applyLink || typeof applyLink !== "string") {
         throw new ExpressError(400, "Exactly one apply link is required as a string.");
     }
-
 
     const addedBy = req.user?.id;
     if (!addedBy) {
@@ -49,7 +48,7 @@ export const createJobHandler = wrapAsync(async (req: Request, res: Response) =>
 
 export const updateJobHandler = wrapAsync(async (req: Request, res: Response) => {
     const id = Number(req.params.id);
-    if (isNaN(id)) {
+    if (isNaN(id) || id <= 0) {
         throw new ExpressError(400, "Invalid job ID");
     }
 
@@ -79,6 +78,23 @@ export const updateJobHandler = wrapAsync(async (req: Request, res: Response) =>
     });
 });
 
+export const getJobByIdHandler = wrapAsync(async (req: Request, res: Response) => {
+    const id = Number(req.params.id);
+    if (isNaN(id) || id <= 0) {
+        throw new ExpressError(400, "Invalid job ID");
+    }
+
+    const job = await getJobById(id);
+    if (!job) {
+        throw new ExpressError(404, "Job not found");
+    }
+
+    return res.status(200).json({
+        status: true,
+        data: job,
+    });
+});
+
 export const getJobsHandler = wrapAsync(async (req: Request, res: Response) => {
     const { page = "1", search, location, filterType } = req.query;
 
@@ -101,4 +117,3 @@ export const getJobsHandler = wrapAsync(async (req: Request, res: Response) => {
         }
     });
 });
-

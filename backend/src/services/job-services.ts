@@ -4,15 +4,14 @@ import type { Job, NewJob } from "@/schema/jobs-schema.js";
 import { eq, ilike, or, and, not, desc, isNull, count, inArray } from "drizzle-orm";
 import { normalizeJobUrl } from "@/utils/normalize-url.js";
 
-
 /**
  * Checks which apply links in the provided array already exist in the jobs table.
  * Normalizes all links and runs a single batched query with IN (...) instead of N individual roundtrips.
- * Returns an array of existing apply links (original unnormalized strings that matched).
+ * Returns an array of existing apply links (original unnormalized strings that matched) and their IDs.
  */
-export async function checkApplyLinksExist(applyLinks: string[]): Promise<string[]> {
+export async function checkApplyLinksExistWithIds(applyLinks: string[]): Promise<{ duplicateLinks: string[]; linkToId: Record<string, number> }> {
     if (!applyLinks || applyLinks.length === 0) {
-        return [];
+        return { duplicateLinks: [], linkToId: {} };
     }
 
     try {
@@ -27,27 +26,41 @@ export async function checkApplyLinksExist(applyLinks: string[]): Promise<string
 
         const normalizedKeys = Array.from(normalizedToOriginals.keys());
         if (normalizedKeys.length === 0) {
-            return [];
+            return { duplicateLinks: [], linkToId: {} };
         }
 
         const existing = await db
-            .select({ applyLink: jobs.applyLink })
+            .select({ id: jobs.id, applyLink: jobs.applyLink })
             .from(jobs)
             .where(inArray(jobs.applyLink, normalizedKeys));
 
         const duplicateLinks: string[] = [];
+        const linkToId: Record<string, number> = {};
         for (const row of existing) {
             const originals = normalizedToOriginals.get(row.applyLink);
             if (originals) {
                 duplicateLinks.push(...originals);
+                for (const orig of originals) {
+                    linkToId[orig] = row.id;
+                }
             }
         }
 
-        return duplicateLinks;
+        return { duplicateLinks, linkToId };
     } catch (error) {
         console.error("Error batch-checking apply links existence in db:", error);
-        return [];
+        return { duplicateLinks: [], linkToId: {} };
     }
+}
+
+/**
+ * Checks which apply links in the provided array already exist in the jobs table.
+ * Normalizes all links and runs a single batched query with IN (...) instead of N individual roundtrips.
+ * Returns an array of existing apply links (original unnormalized strings that matched).
+ */
+export async function checkApplyLinksExist(applyLinks: string[]): Promise<string[]> {
+    const { duplicateLinks } = await checkApplyLinksExistWithIds(applyLinks);
+    return duplicateLinks;
 }
 
 /**
@@ -61,6 +74,14 @@ export async function checkApplyLinkExists(applyLink: string): Promise<boolean> 
 
     const duplicates = await checkApplyLinksExist([applyLink]);
     return duplicates.length > 0;
+}
+
+/**
+ * Retrieves a single job by its ID.
+ */
+export async function getJobById(id: number): Promise<Job | null> {
+    const [job] = await db.select().from(jobs).where(eq(jobs.id, id));
+    return job || null;
 }
 
 /**
@@ -221,4 +242,3 @@ export async function getJobsList(page: number, jobsPerPage: number, filters: { 
         totalCount
     };
 }
-
