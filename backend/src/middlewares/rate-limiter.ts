@@ -1,4 +1,4 @@
-import { rateLimit, type Options, type RateLimitRequestHandler } from "express-rate-limit";
+import { rateLimit, ipKeyGenerator, type Options, type RateLimitRequestHandler } from "express-rate-limit";
 import type { Request, Response, NextFunction } from "express";
 
 export interface RateLimiterCustomOptions {
@@ -7,6 +7,23 @@ export interface RateLimiterCustomOptions {
     message?: string;
     skipSuccessfulRequests?: boolean;
     skipFailedRequests?: boolean;
+}
+
+/**
+ * Extracts client IP prioritizing Cloudflare's 'cf-connecting-ip' header,
+ * followed by 'x-forwarded-for', and standard Express req.ip.
+ */
+export function getClientIp(req: Request): string {
+    const cfIp = req.headers["cf-connecting-ip"];
+    if (typeof cfIp === "string" && cfIp.trim()) {
+        return cfIp.trim();
+    }
+    const forwarded = req.headers["x-forwarded-for"];
+    if (typeof forwarded === "string" && forwarded.trim()) {
+        const first = forwarded.split(",")[0]?.trim();
+        if (first) return first;
+    }
+    return req.ip || req.socket?.remoteAddress || "127.0.0.1";
 }
 
 /**
@@ -23,6 +40,9 @@ export function createRateLimiter(options?: RateLimiterCustomOptions): RateLimit
         standardHeaders: "draft-8",
         legacyHeaders: false,
         message,
+        keyGenerator: (req: Request) => {
+            return ipKeyGenerator(getClientIp(req));
+        },
         skip: () => process.env.DISABLE_RATE_LIMIT === "true",
         ...(options?.skipSuccessfulRequests !== undefined ? { skipSuccessfulRequests: options.skipSuccessfulRequests } : {}),
         ...(options?.skipFailedRequests !== undefined ? { skipFailedRequests: options.skipFailedRequests } : {}),
@@ -65,4 +85,3 @@ export const scraperLimiter: RateLimitRequestHandler = createRateLimiter({
     limit: process.env.SCRAPER_RATE_LIMIT_MAX ? Number(process.env.SCRAPER_RATE_LIMIT_MAX) : 20,
     message: "Too many scraping requests from this IP, please try again after 15 minutes.",
 });
-

@@ -3,6 +3,23 @@ import chalk from "chalk";
 import type { Request, Response, NextFunction } from "express";
 
 /**
+ * Extracts client IP prioritizing Cloudflare's 'cf-connecting-ip' header,
+ * followed by 'x-forwarded-for', and standard Express req.ip.
+ */
+export function getClientIp(req: Request): string {
+  const cfIp = req.headers["cf-connecting-ip"];
+  if (typeof cfIp === "string" && cfIp.trim()) {
+    return cfIp.trim();
+  }
+  const forwarded = req.headers["x-forwarded-for"];
+  if (typeof forwarded === "string" && forwarded.trim()) {
+    const first = forwarded.split(",")[0]?.trim();
+    if (first) return first;
+  }
+  return req.ip || req.socket?.remoteAddress || "unknown";
+}
+
+/**
  * Returns colorized HTTP method string.
  */
 export function getColoredMethod(method: string = "UNKNOWN"): string {
@@ -35,7 +52,7 @@ export function incomingRequestLogger(req: Request, _res: Response, next: NextFu
     timeZone: "Asia/Kolkata",
     hour12: true,
   });
-  const ip = req.ip || req.socket.remoteAddress || "unknown";
+  const ip = getClientIp(req);
   const url = req.originalUrl || req.url;
 
   console.log(
@@ -54,10 +71,9 @@ morgan.token("ist-time", () => {
   });
 });
 
-// Client IP (resolves real IP via trust proxy)
+// Client IP (resolves real client IP)
 morgan.token("client-ip", (req) => {
-  const expressReq = req as Request;
-  return expressReq.ip || expressReq.socket?.remoteAddress || "unknown";
+  return getClientIp(req as Request);
 });
 
 // Colored status code

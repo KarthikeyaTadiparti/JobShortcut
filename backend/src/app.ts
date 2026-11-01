@@ -15,12 +15,12 @@ import jobsRouter from "./routes/jobs-routes.js";
 
 const app = express();
 
-// Trust reverse proxy hops (e.g. Nginx, Cloudflare, Render, Vercel) for accurate client IP detection
+// Trust reverse proxy hops (Cloudflare edge proxy + Render router = 2 hops)
 const trustProxySetting = process.env.TRUST_PROXY
   ? !isNaN(Number(process.env.TRUST_PROXY))
     ? Number(process.env.TRUST_PROXY)
     : process.env.TRUST_PROXY
-  : 1;
+  : 2;
 app.set("trust proxy", trustProxySetting);
 
 // Standard middlewares
