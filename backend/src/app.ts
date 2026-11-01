@@ -2,7 +2,7 @@ import express from "express";
 import cookieParser from "cookie-parser";
 import cors from "cors";
 import "dotenv/config";
-import morganMiddleware from "./middlewares/morgan.js";
+import morganMiddleware, { incomingRequestLogger } from "./middlewares/morgan.js";
 import { errorHandler, handle404Error } from "./middlewares/errorhandler.js";
 import { apiLimiter } from "./middlewares/rate-limiter.js";
 
@@ -10,6 +10,7 @@ import { apiLimiter } from "./middlewares/rate-limiter.js";
 import authRouter from "./routes/auth-routes.js";
 import adminRouter from "./routes/admin-routes.js";
 import scraperRouter from "./routes/scraper-routes.js";
+import whatsappRouter from "./routes/whatsapp-routes.js";
 import jobsRouter from "./routes/jobs-routes.js";
 
 const app = express();
@@ -29,6 +30,7 @@ app.use(
     credentials: true,
   })
 );
+app.use(incomingRequestLogger);
 app.use(morganMiddleware);
 app.use(express.json());
 app.use(cookieParser());
@@ -44,8 +46,8 @@ app.get("/", (_req, res) => {
 // Route mountings
 app.use("/api/auth", authRouter);
 app.use("/api/admins", adminRouter);
-app.use("/api/scrapers", scraperRouter);
 app.use("/api/scraper", scraperRouter);
+app.use("/api/whatsapp", whatsappRouter);
 app.use("/api/jobs", jobsRouter);
 
 // 404 Error handler

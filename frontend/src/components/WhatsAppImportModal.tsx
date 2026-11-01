@@ -13,7 +13,7 @@ import {
   startWhatsAppScraperStream,
   type ExtractionScope,
   type WhatsAppImportResult,
-} from '@/api/scraper';
+} from '@/api/whatsapp';
 import { toast } from 'sonner';
 
 interface WhatsAppImportModalProps {

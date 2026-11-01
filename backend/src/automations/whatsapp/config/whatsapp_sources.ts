@@ -71,7 +71,7 @@ export const DEFAULT_WHATSAPP_GROUPS: WhatsAppGroupConfig[] = [
 
 export const DEFAULT_WHATSAPP_CHANNELS: WhatsAppChannelConfig[] = [
     {
-        channelName: 'Freshershunt',
+        channelName: 'Freshershunt - Jobs, Walkin Drives, Off Campus Drives',
         targetDomain: 'freshershunt.in',
         allowedDomains: ['freshershunt.in'],
         enabled: true,

@@ -47,7 +47,7 @@ cd frontend && npm run lint && npm run build              # eslint, then tsc -b 
 - A scraper failing on one URL must return `null`, not throw, so batch runs continue. Long-running scrapes stream progress over SSE (`utils/sse-stream.ts`).
 - Do not use Redux for server data or React Query for auth/session state.
 - Schema changes go through Drizzle Kit migrations, never manual SQL.
-- `/api/scrapers` and `/api/scraper` are both mounted on the same router.
+- `/api/scraper` is mounted for batch URL scraping, and `/api/whatsapp` is mounted for WhatsApp scraping.
 
 ## Workflows
 

@@ -1,0 +1,152 @@
+export type ExtractionScope = 'unread' | 'today' | 'yesterday';
+export type WhatsAppSourceType = 'group' | 'channel';
+
+export interface SourceScrapeResult {
+  sourceName: string;
+  sourceType: WhatsAppSourceType;
+  targetDomain: string;
+  status: 'success' | 'skipped' | 'failed' | 'warning';
+  unreadCount?: number;
+  messagesRendered?: number;
+  messagesProcessed?: number;
+  extractedLinks: string[];
+  warning?: string;
+  error?: string;
+}
+
+export interface WhatsAppImportResult {
+  success: boolean;
+  scope: ExtractionScope;
+  totalSources: number;
+  totalGroups: number;
+  totalChannels: number;
+  processedSources: number;
+  processedGroups: number;
+  processedChannels: number;
+  skippedSources: number;
+  failedSources: number;
+  sourceResults: SourceScrapeResult[];
+  urls: string[];
+  totalUrls: number;
+  startedAt: string;
+  completedAt: string;
+  durationMs: number;
+}
+
+export interface WhatsAppScrapeCallbacks {
+  onStatus?: (message: string) => void;
+  onQR?: (qrDataUrl: string) => void;
+  onAuthenticated?: () => void;
+  onSourceStart?: (sourceType: WhatsAppSourceType, sourceName: string, targetDomain: string, index: number, total: number) => void;
+  onSourceProgress?: (sourceType: WhatsAppSourceType, sourceName: string, message: string, unreadCount?: number) => void;
+  onSourceComplete?: (sourceType: WhatsAppSourceType, sourceName: string, result: SourceScrapeResult) => void;
+  onDone?: (result: WhatsAppImportResult) => void;
+  onError?: (message: string) => void;
+}
+
+export async function startWhatsAppScraperStream(
+  options: { scope: ExtractionScope; headless?: boolean; signal?: AbortSignal },
+  callbacks: WhatsAppScrapeCallbacks
+) {
+  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+  const { signal, ...bodyOptions } = options;
+  const response = await fetch(`${API_URL}/api/whatsapp`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(bodyOptions),
+    credentials: 'include',
+    signal,
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    let errMsg = `Request failed with status ${response.status}`;
+    try {
+      const errJson = JSON.parse(errText);
+      errMsg = errJson.message || errMsg;
+    } catch (_) {}
+    throw new Error(errMsg);
+  }
+
+  const reader = response.body?.getReader();
+  if (!reader) {
+    throw new Error('Response stream is not readable.');
+  }
+
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() || '';
+
+    for (const line of lines) {
+      const trimmedLine = line.trim();
+      if (trimmedLine.startsWith('data: ')) {
+        try {
+          const eventData = JSON.parse(trimmedLine.slice(6));
+
+          switch (eventData.type) {
+            case 'status':
+              callbacks.onStatus?.(eventData.message);
+              break;
+            case 'qr':
+              callbacks.onQR?.(eventData.qrDataUrl);
+              break;
+            case 'authenticated':
+              callbacks.onAuthenticated?.();
+              break;
+            case 'source_start':
+              callbacks.onSourceStart?.(
+                eventData.sourceType,
+                eventData.sourceName,
+                eventData.targetDomain,
+                eventData.index,
+                eventData.total
+              );
+              break;
+            case 'source_progress':
+              callbacks.onSourceProgress?.(
+                eventData.sourceType,
+                eventData.sourceName,
+                eventData.message,
+                eventData.unreadCount
+              );
+              break;
+            case 'source_complete':
+              callbacks.onSourceComplete?.(eventData.sourceType, eventData.sourceName, eventData.result);
+              break;
+            case 'done':
+              callbacks.onDone?.(eventData.result);
+              break;
+            case 'error':
+              callbacks.onError?.(eventData.message);
+              break;
+          }
+        } catch (e) {
+          console.error('Failed to parse WhatsApp SSE line:', e);
+        }
+      }
+    }
+  }
+}
+
+export async function checkWhatsAppSessionStatus(): Promise<{ authenticated: boolean }> {
+  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+  const response = await fetch(`${API_URL}/api/whatsapp/status`, {
+    method: 'GET',
+    credentials: 'include',
+  });
+  if (!response.ok) {
+    return { authenticated: false };
+  }
+  const data = await response.json();
+  return data.data || { authenticated: false };
+}
+
