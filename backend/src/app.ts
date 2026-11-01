@@ -4,6 +4,7 @@ import cors from "cors";
 import "dotenv/config";
 import morganMiddleware from "./middlewares/morgan.js";
 import { errorHandler, handle404Error } from "./middlewares/errorhandler.js";
+import { apiLimiter } from "./middlewares/rate-limiter.js";
 
 // Route imports
 import authRouter from "./routes/auth-routes.js";
@@ -12,6 +13,14 @@ import scraperRouter from "./routes/scraper-routes.js";
 import jobsRouter from "./routes/jobs-routes.js";
 
 const app = express();
+
+// Trust reverse proxy hops (e.g. Nginx, Cloudflare, Render, Vercel) for accurate client IP detection
+const trustProxySetting = process.env.TRUST_PROXY
+  ? !isNaN(Number(process.env.TRUST_PROXY))
+    ? Number(process.env.TRUST_PROXY)
+    : process.env.TRUST_PROXY
+  : 1;
+app.set("trust proxy", trustProxySetting);
 
 // Standard middlewares
 app.use(
@@ -24,6 +33,8 @@ app.use(morganMiddleware);
 app.use(express.json());
 app.use(cookieParser());
 
+// Rate limiting (IP-based) for API routes
+app.use("/api", apiLimiter);
 
 // Home endpoint
 app.get("/", (_req, res) => {
