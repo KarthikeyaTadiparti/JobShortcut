@@ -532,6 +532,66 @@ function UserHome() {
                                 Make job searching easier, faster, and completely distraction-free for every student and job seeker.
                             </p>
                         </div>
+
+                        {/* Creator Profiles */}
+                        <div className="pt-2 space-y-3">
+                            <p className="text-xs font-bold uppercase tracking-wider text-[#5B6475]">
+                                Connect with the Creators
+                            </p>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <a
+                                    href="https://www.linkedin.com/in/saitejaviswanadham/"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="group flex items-center justify-between p-4 rounded-2xl bg-[#FCFAFF] border border-[#EBE3FF] hover:border-[#5B3DF5]/50 hover:bg-white hover:shadow-md transition-all duration-300"
+                                >
+                                    <div className="flex items-center gap-3.5">
+                                        <div className="w-11 h-11 rounded-xl bg-linear-to-br from-[#5B3DF5] to-[#8F75FF] text-white flex items-center justify-center font-bold text-sm shadow-sm group-hover:scale-105 transition-transform">
+                                            VS
+                                        </div>
+                                        <div>
+                                            <h4 className="text-[15px] font-bold text-[#111827] group-hover:text-[#5B3DF5] transition-colors leading-snug">
+                                                Viswanadham Saiteja
+                                            </h4>
+                                            <span className="text-xs text-[#5B6475] font-medium">
+                                                Creator &amp; Developer
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div className="w-8 h-8 rounded-lg bg-white border border-[#EBE3FF] group-hover:border-[#0A66C2]/30 group-hover:bg-[#0A66C2]/10 flex items-center justify-center transition-colors shrink-0">
+                                        <svg className="w-4 h-4 fill-[#0A66C2]" viewBox="0 0 24 24">
+                                            <path d="M19 3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14m-.5 15.5v-5.3a3.26 3.26 0 0 0-3.26-3.26c-.85 0-1.84.52-2.28 1.3v-1.11h-2.79v8.37h2.79v-4.93c0-.77.62-1.4 1.39-1.4a1.4 1.4 0 0 1 1.4 1.4v4.93h2.75M6.46 10.9v8.37H9.2V10.9H6.46M7.83 6.2a1.66 1.66 0 0 0-1.66 1.66c0 .92.74 1.66 1.66 1.66.92 0 1.66-.74 1.66-1.66 0-.92-.74-1.66-1.66-1.66Z" />
+                                        </svg>
+                                    </div>
+                                </a>
+
+                                <a
+                                    href="https://www.linkedin.com/in/karthikeya10/"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="group flex items-center justify-between p-4 rounded-2xl bg-[#FCFAFF] border border-[#EBE3FF] hover:border-[#5B3DF5]/50 hover:bg-white hover:shadow-md transition-all duration-300"
+                                >
+                                    <div className="flex items-center gap-3.5">
+                                        <div className="w-11 h-11 rounded-xl bg-linear-to-br from-[#5B3DF5] to-[#8F75FF] text-white flex items-center justify-center font-bold text-sm shadow-sm group-hover:scale-105 transition-transform">
+                                            KT
+                                        </div>
+                                        <div>
+                                            <h4 className="text-[15px] font-bold text-[#111827] group-hover:text-[#5B3DF5] transition-colors leading-snug">
+                                                Karthikeya Tadiparti
+                                            </h4>
+                                            <span className="text-xs text-[#5B6475] font-medium">
+                                                Creator &amp; Developer
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div className="w-8 h-8 rounded-lg bg-white border border-[#EBE3FF] group-hover:border-[#0A66C2]/30 group-hover:bg-[#0A66C2]/10 flex items-center justify-center transition-colors shrink-0">
+                                        <svg className="w-4 h-4 fill-[#0A66C2]" viewBox="0 0 24 24">
+                                            <path d="M19 3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14m-.5 15.5v-5.3a3.26 3.26 0 0 0-3.26-3.26c-.85 0-1.84.52-2.28 1.3v-1.11h-2.79v8.37h2.79v-4.93c0-.77.62-1.4 1.39-1.4a1.4 1.4 0 0 1 1.4 1.4v4.93h2.75M6.46 10.9v8.37H9.2V10.9H6.46M7.83 6.2a1.66 1.66 0 0 0-1.66 1.66c0 .92.74 1.66 1.66 1.66.92 0 1.66-.74 1.66-1.66 0-.92-.74-1.66-1.66-1.66Z" />
+                                        </svg>
+                                    </div>
+                                </a>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </section>
