@@ -290,7 +290,14 @@ export async function openFollowedChannel(
         }
 
         // Ensure Channels view is active
-        await navigateToChannelsTab(page);
+        const switchedToChannels = await navigateToChannelsTab(page);
+        if (!switchedToChannels) {
+            return {
+                status: "error",
+                unreadCount: 0,
+                message: `Failed to switch to WhatsApp Channels tab before opening '${channelName}'`,
+            };
+        }
         await clearActiveSearchInput(page);
 
         const selectors = {
@@ -305,14 +312,27 @@ export async function openFollowedChannel(
 
         // 2. Filter search inside Channels view
         if (!row) {
-            const searchInput = page.locator(getCombinedSelector(WHATSAPP_LOCATORS.channelsSearchInput)).first();
-            if ((await searchInput.count()) > 0 && (await searchInput.isVisible().catch(() => false))) {
-                await searchInput.click({ force: true });
-                await page.keyboard.press("ControlOrMeta+A").catch(() => {});
-                await page.keyboard.press("Backspace").catch(() => {});
-                await page.keyboard.type(channelName, { delay: 40 });
-                await randomJitter(600, 1000);
-                row = await findListRow(page, channelName, selectors, 3500);
+            const searchInputs = page.locator(getCombinedSelector(WHATSAPP_LOCATORS.channelsSearchInput));
+            const inputCount = await searchInputs.count().catch(() => 0);
+            let searchInput: ReturnType<Page["locator"]> | null = null;
+            for (let i = 0; i < inputCount; i++) {
+                const candidate = searchInputs.nth(i);
+                if (await candidate.isVisible().catch(() => false)) {
+                    searchInput = candidate;
+                    break;
+                }
+            }
+            if (searchInput) {
+                for (const query of getSearchCandidates(channelName)) {
+                    await clearActiveSearchInput(page);
+                    await searchInput.click({ force: true });
+                    await page.keyboard.press("ControlOrMeta+A").catch(() => {});
+                    await page.keyboard.press("Backspace").catch(() => {});
+                    await page.keyboard.type(query, { delay: 40 });
+                    await randomJitter(600, 1000);
+                    row = await findListRow(page, channelName, selectors, 3500);
+                    if (row) break;
+                }
             }
         }
 

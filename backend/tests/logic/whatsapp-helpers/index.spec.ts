@@ -14,6 +14,7 @@ import {
 } from "@/automations/whatsapp/helpers/whatsapp_message_merge.js";
 import { evaluateWindowMessages, type HarvestStats } from "@/automations/whatsapp/helpers/whatsapp_harvester.js";
 import { launchWhatsAppContext, checkWhatsAppAuthState, WhatsAppSessionBusyError } from "@/automations/whatsapp/whatsapp_session.js";
+import { navigateToChannelsTab, isChannelsViewActive, isChatsViewActive } from "@/automations/whatsapp/helpers/whatsapp_navigation.js";
 import { highlightElement } from "../../helpers/dom-highlighter.js";
 
 const msg = (id: string, prePlainText: string): HarvestItem => ({
@@ -292,5 +293,47 @@ test.describe("WhatsApp helper logic (offline)", { tag: ["@logic", "@offline"] }
         } finally {
             fs.rmSync(sessionDir, { recursive: true, force: true });
         }
+    });
+
+    test("navigateToChannelsTab verifies visibility and switches cleanly after group scraping", async ({ page }) => {
+        await page.setContent(`
+            <div>
+              <button aria-label="Chats" aria-pressed="true" type="button" style="width:40px;height:40px;">Chats</button>
+              <button id="channels-btn" aria-label="Channels" aria-pressed="false" type="button" style="width:40px;height:40px;"
+                onclick="document.getElementById('channels-drawer').style.display='block'">Channels</button>
+              <div id="side" style="width:300px;height:400px;">
+                <div id="pane-side" style="width:300px;height:400px;">
+                  <div data-testid="chat-list-search-container"><input aria-label="Search or start a new chat" /></div>
+                </div>
+              </div>
+              <div id="channels-drawer" data-testid="newsletter-tab-drawer" style="display:none;width:300px;height:400px;">
+                <input aria-label="Search" placeholder="Search" style="width:200px;height:30px;" />
+                <div data-testid="newsletter-tab-channel-list" style="width:300px;height:300px;">
+                  <div role="navigation" aria-label="Channel list"></div>
+                </div>
+              </div>
+            </div>
+        `);
+
+        // 1. Hidden Channels drawer must NOT count as active before clicking
+        expect(await isChannelsViewActive(page), "Hidden channels drawer must not report as active").toBe(false);
+        expect(await isChatsViewActive(page), "Chats must report active while channels drawer is hidden").toBe(true);
+
+        // 2. Clicking Channels button makes drawer visible -> navigateToChannelsTab returns true
+        const switched = await navigateToChannelsTab(page);
+        expect(switched, "navigateToChannelsTab must return true once Channels drawer becomes visible").toBe(true);
+        expect(await isChannelsViewActive(page), "Channels view must be active after switching").toBe(true);
+        expect(await isChatsViewActive(page), "Chats view must be inactive while Channels drawer covers it").toBe(false);
+
+        // 3. If button click does NOT reveal Channels drawer, navigateToChannelsTab must return false
+        await page.setContent(`
+            <div>
+              <button aria-label="Channels" aria-pressed="false" type="button" style="width:40px;height:40px;">Channels</button>
+              <div id="side" style="width:300px;height:400px;"><div id="pane-side" style="width:300px;height:400px;"></div></div>
+              <div data-testid="newsletter-tab-drawer" style="display:none;width:300px;height:400px;"></div>
+            </div>
+        `);
+        const failedSwitch = await navigateToChannelsTab(page);
+        expect(failedSwitch, "navigateToChannelsTab must return false when Channels drawer fails to open").toBe(false);
     });
 });

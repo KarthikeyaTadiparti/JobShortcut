@@ -25,14 +25,15 @@ export async function waitForWhatsAppLoadingToComplete(
     // ignore
   }
 
-  // 2. Wait until either the Chat List, Main Header, or Login QR canvas is mounted and visible
+  // 2. Wait until the Chat List, Navigation Rail, Conversation Header, Channels List, or Login QR canvas is mounted and visible
   try {
     const readySelectors = [
       getCombinedSelector(WHATSAPP_LOCATORS.chatListContainer),
+      getCombinedSelector(WHATSAPP_LOCATORS.chatsTabBtn),
+      getCombinedSelector(WHATSAPP_LOCATORS.channelsTabBtn),
       getCombinedSelector(WHATSAPP_LOCATORS.conversationHeader),
       getCombinedSelector(WHATSAPP_LOCATORS.qrCanvas),
       getCombinedSelector(WHATSAPP_LOCATORS.channelsListContainer),
-      getCombinedSelector(WHATSAPP_LOCATORS.introTitle),
     ].join(", ");
 
     const readyLoc = page.locator(readySelectors);

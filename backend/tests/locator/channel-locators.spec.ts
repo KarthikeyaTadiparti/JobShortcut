@@ -1,12 +1,12 @@
-import { test, expect, chromium, type BrowserContext, type Page } from "@playwright/test";
+import { test, expect, type BrowserContext, type Page } from "@playwright/test";
 import path from "path";
-import fs from "fs";
 import { fileURLToPath } from "url";
 import { WHATSAPP_LOCATORS, getCombinedSelector } from "@/automations/whatsapp/config/whatsapp_locators.js";
 import { DEFAULT_WHATSAPP_CHANNELS } from "@/automations/whatsapp/config/whatsapp_sources.js";
+import { launchWhatsAppContext, checkWhatsAppAuthState } from "@/automations/whatsapp/whatsapp_session.js";
+import { navigateToChannelsTab, isChannelsViewActive } from "@/automations/whatsapp/helpers/whatsapp_navigation.js";
 import { validateLocatorWithFallback } from "../helpers/locator-tester.js";
 import { printDiagnosticReport, type LocatorValidationResult } from "../helpers/reporter-formatter.js";
-import { waitForWhatsAppLoadingToComplete } from "../helpers/page-ready.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -17,54 +17,28 @@ const TARGET_CHANNEL_NAME = DEFAULT_WHATSAPP_CHANNELS[0]?.channelName || "Freshe
 test.describe("WhatsApp Channels UI & Broadcast Feed Locators", { tag: ["@locator", "@channel-locator"] }, () => {
   let context: BrowserContext;
   let page: Page;
+  let isAuthenticated = false;
   const results: LocatorValidationResult[] = [];
 
   test.beforeAll(async () => {
-    if (!fs.existsSync(sessionDir)) {
-      fs.mkdirSync(sessionDir, { recursive: true });
-    }
+    const session = await launchWhatsAppContext({ headless: true, sessionDir });
+    context = session.context;
+    page = session.page;
 
-    context = await chromium.launchPersistentContext(sessionDir, {
-      headless: true,
-      viewport: { width: 1366, height: 768 },
-      ignoreDefaultArgs: ["--enable-automation"],
-      userAgent:
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
-      args: [
-        "--disable-blink-features=AutomationControlled",
-        "--disable-infobars",
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage",
-        "--no-first-run",
-      ],
-    });
-
-    await context.addInitScript(() => {
-      Object.defineProperty(navigator, "webdriver", { get: () => undefined });
-      Object.defineProperty(navigator, "languages", { get: () => ["en-US", "en"] });
-    });
-
-    const pages = context.pages();
-    page = pages[0] || (await context.newPage());
+    const authState = await checkWhatsAppAuthState(page, 45000);
+    isAuthenticated = authState.authenticated;
   });
 
   test.afterAll(async () => {
     printDiagnosticReport("channel", results, sessionDir);
     if (context) {
-      await context.close();
+      await context.close().catch(() => {});
     }
   });
 
   test("Validate Left Pane Navigation, Channels List Scroll Area, and Channel Item Locators", async () => {
     test.setTimeout(120000);
-    await test.step("Connect to WhatsApp Web and wait for session ready", async () => {
-      await page.goto("https://web.whatsapp.com", {
-        waitUntil: "domcontentloaded",
-        timeout: 60000,
-      });
-      await waitForWhatsAppLoadingToComplete(page, 45000);
-    });
+    test.skip(!isAuthenticated, "Requires authenticated WhatsApp session");
 
     // 1. Validate Channels Navigation Rail Button
     const tabRes = await validateLocatorWithFallback(
@@ -73,11 +47,12 @@ test.describe("WhatsApp Channels UI & Broadcast Feed Locators", { tag: ["@locato
       { timeoutMs: 10000, highlightDurationMs: 400 }
     );
     results.push(tabRes.result);
+    expect(tabRes.result.status, "channelsTabBtn must not be BROKEN").not.toBe("BROKEN");
 
     if (tabRes.activeLocator) {
       await test.step("Click Channels tab button to navigate to Channels view", async () => {
-        await tabRes.activeLocator!.click().catch(() => {});
-        await page.waitForTimeout(2000);
+        await tabRes.activeLocator!.click();
+        await page.waitForTimeout(1500);
       });
     }
 
@@ -88,6 +63,8 @@ test.describe("WhatsApp Channels UI & Broadcast Feed Locators", { tag: ["@locato
       { timeoutMs: 8000, highlightDurationMs: 400 }
     );
     results.push(containerRes.result);
+    expect(containerRes.result.status, "channelsListContainer must not be BROKEN").not.toBe("BROKEN");
+    expect(await isChannelsViewActive(page), "Channels view must be visibly active after clicking Channels tab").toBe(true);
 
     // 3. Validate Channels Search Input
     const searchInputRes = await validateLocatorWithFallback(
@@ -171,23 +148,38 @@ test.describe("WhatsApp Channels UI & Broadcast Feed Locators", { tag: ["@locato
 
   test(`Validate Channel Feed Pane, Header, Messages, and Right Section Scroll Area on '${TARGET_CHANNEL_NAME}'`, async () => {
     test.setTimeout(120000);
-    // 7. Select and Open Target Channel
-    await test.step(`Search and open target followed channel '${TARGET_CHANNEL_NAME}' in conversation view`, async () => {
-      const searchBox = page.locator(getCombinedSelector(WHATSAPP_LOCATORS.channelsSearchInput)).first();
+    test.skip(!isAuthenticated, "Requires authenticated WhatsApp session");
 
-      if ((await searchBox.count()) > 0 && (await searchBox.isVisible({ timeout: 5000 }).catch(() => false))) {
+    // 7. Select and Open Target Channel
+    await test.step(`Ensure Channels tab is active and open '${TARGET_CHANNEL_NAME}'`, async () => {
+      const switched = await navigateToChannelsTab(page);
+      expect(switched, "Must switch to Channels view before locating target channel").toBe(true);
+
+      const searchBoxes = page.locator(getCombinedSelector(WHATSAPP_LOCATORS.channelsSearchInput));
+      const count = await searchBoxes.count().catch(() => 0);
+      let searchBox: ReturnType<Page["locator"]> | null = null;
+      for (let i = 0; i < count; i++) {
+        const candidate = searchBoxes.nth(i);
+        if (await candidate.isVisible().catch(() => false)) {
+          searchBox = candidate;
+          break;
+        }
+      }
+
+      if (searchBox) {
+        const shortName = TARGET_CHANNEL_NAME.split(/\s*-\s*/)[0]?.trim() || TARGET_CHANNEL_NAME;
         await searchBox.click({ force: true });
         await page.waitForTimeout(200);
 
         await page.keyboard.press("Control+A").catch(() => {});
         await page.keyboard.press("Backspace").catch(() => {});
 
-        await page.keyboard.type(TARGET_CHANNEL_NAME, { delay: 50 });
+        await page.keyboard.type(shortName, { delay: 50 });
         await page.waitForTimeout(1500);
 
         const matchingRow = page
           .locator(getCombinedSelector(WHATSAPP_LOCATORS.channelListRow))
-          .filter({ hasText: new RegExp(TARGET_CHANNEL_NAME, "i") })
+          .filter({ hasText: new RegExp(shortName, "i") })
           .first();
 
         if ((await matchingRow.count()) > 0 && (await matchingRow.isVisible({ timeout: 4000 }).catch(() => false))) {
@@ -212,6 +204,7 @@ test.describe("WhatsApp Channels UI & Broadcast Feed Locators", { tag: ["@locato
       { timeoutMs: 10000, highlightDurationMs: 400 }
     );
     results.push(headerRes.result);
+    expect(headerRes.result.status, "channelHeader must not be BROKEN").not.toBe("BROKEN");
 
     // 9. Validate Active Channel Title
     const chatTitleRes = await validateLocatorWithFallback(
@@ -220,6 +213,7 @@ test.describe("WhatsApp Channels UI & Broadcast Feed Locators", { tag: ["@locato
       { timeoutMs: 8000, highlightDurationMs: 400 }
     );
     results.push(chatTitleRes.result);
+    expect(chatTitleRes.result.status, "channelChatTitle must not be BROKEN").not.toBe("BROKEN");
 
     // 10. Validate Channel Feed Right Section Scroll Panel (Messages Scroll Container)
     const scrollPanelRes = await validateLocatorWithFallback(
@@ -228,6 +222,7 @@ test.describe("WhatsApp Channels UI & Broadcast Feed Locators", { tag: ["@locato
       { timeoutMs: 8000, highlightDurationMs: 400 }
     );
     results.push(scrollPanelRes.result);
+    expect(scrollPanelRes.result.status, "conversationPanelMessages must not be BROKEN").not.toBe("BROKEN");
 
     // 11. Validate Channel Message Container
     const msgContainerRes = await validateLocatorWithFallback(
@@ -236,6 +231,7 @@ test.describe("WhatsApp Channels UI & Broadcast Feed Locators", { tag: ["@locato
       { timeoutMs: 10000, highlightDurationMs: 400 }
     );
     results.push(msgContainerRes.result);
+    expect(msgContainerRes.result.status, "channelMessageContainer must not be BROKEN").not.toBe("BROKEN");
 
     // 12. Validate Channel Message Text Content
     const msgTextRes = await validateLocatorWithFallback(

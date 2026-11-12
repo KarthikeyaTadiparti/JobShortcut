@@ -147,7 +147,26 @@ export async function scrapeWhatsAppJobLinks(
             try {
                 if (source.type === "group") {
                     // Ensure Chats tab is active
-                    await navigateToChatsTab(page);
+                    const switchedToChats = await navigateToChatsTab(page);
+                    if (!switchedToChats) {
+                        const navErrorResult: SourceScrapeResult = {
+                            sourceName: source.name,
+                            sourceType: "group",
+                            targetDomain: source.targetDomain,
+                            status: "failed",
+                            extractedLinks: [],
+                            error: "Failed to switch to WhatsApp Chats tab",
+                        };
+                        sourceResults.push(navErrorResult);
+                        failedSources++;
+                        emit({
+                            type: "source_complete",
+                            sourceType: "group",
+                            sourceName: source.name,
+                            result: navErrorResult,
+                        });
+                        continue;
+                    }
 
                     emit({
                         type: "source_progress",
@@ -304,7 +323,26 @@ export async function scrapeWhatsAppJobLinks(
                     await randomJitter(800, 1800);
                 } else if (source.type === "channel") {
                     // 1. Navigate to Channels tab
-                    await navigateToChannelsTab(page);
+                    const switchedToChannels = await navigateToChannelsTab(page);
+                    if (!switchedToChannels) {
+                        const navErrorResult: SourceScrapeResult = {
+                            sourceName: source.name,
+                            sourceType: "channel",
+                            targetDomain: source.targetDomain,
+                            status: "failed",
+                            extractedLinks: [],
+                            error: "Failed to switch to WhatsApp Channels tab",
+                        };
+                        sourceResults.push(navErrorResult);
+                        failedSources++;
+                        emit({
+                            type: "source_complete",
+                            sourceType: "channel",
+                            sourceName: source.name,
+                            result: navErrorResult,
+                        });
+                        continue;
+                    }
 
                     emit({
                         type: "source_progress",
